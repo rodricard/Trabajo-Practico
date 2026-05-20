@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}{{ action_label }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ action_label }}</h1>
+    {% if board %}
+    <a href="{% url 'board_detail' board.pk %}" class="btn btn-ghost">Cancelar</a>
+    {% else %}
+    <a href="{% url 'board_list' %}" class="btn btn-ghost">Cancelar</a>
+    {% endif %}
+</div>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="field-errors">
+                {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{{ action_label }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

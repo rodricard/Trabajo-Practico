@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}{{ board.title }}{% endblock %}
+
+{% block content %}
+<div class="board-header" style="background-color: {{ board.background_color }};">
+    <div class="board-header-inner">
+        <h1>{{ board.title }}</h1>
+        <div class="board-actions">
+            {% if is_owner %}
+            <a href="{% url 'board_members' board.pk %}" class="btn btn-ghost-light">Miembros</a>
+            <a href="{% url 'board_update' board.pk %}" class="btn btn-ghost-light">Configurar</a>
+            <a href="{% url 'board_delete' board.pk %}" class="btn btn-ghost-light">Eliminar</a>
+            {% endif %}
+            <a href="{% url 'board_list' %}" class="btn btn-ghost-light">&#8592; Tableros</a>
+        </div>
+    </div>
+</div>
+
+<div class="kanban-board">
+    {% for lst in lists %}
+    <div class="kanban-list">
+        <div class="list-header">
+            <h3>{{ lst.title }}</h3>
+            <form method="post" action="{% url 'list_delete' lst.pk %}"
+                  onsubmit="return confirm('¿Eliminar lista y sus tarjetas?')">
+                {% csrf_token %}
+                <button type="submit" class="btn-icon" title="Eliminar lista">&times;</button>
+            </form>
+        </div>
+
+        <div class="cards-container">
+            {% for card in lst.cards.all %}
+            <a href="{% url 'card_detail' card.pk %}" class="card-item">
+                <span class="card-title">{{ card.title }}</span>
+                <div class="card-meta">
+                    {% if card.due_date %}
+                    <span class="card-due">&#128197; {{ card.due_date|date:"d/m" }}</span>
+                    {% endif %}
+                    {% if card.assigned_to %}
+                    <span class="card-avatar" title="{{ card.assigned_to.username }}">
+                        {{ card.assigned_to.username|first|upper }}
+                    </span>
+                    {% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <p class="list-empty">Sin tarjetas</p>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="{% url 'card_create' lst.pk %}" class="add-card-form">
+            {% csrf_token %}
+            {{ card_form.title }}
+            <button type="submit" class="btn btn-ghost btn-sm">+ Agregar tarjeta</button>
+        </form>
+    </div>
+    {% endfor %}
+
+    <div class="kanban-list kanban-list--add">
+        <form method="post" action="{% url 'list_create' board.pk %}">
+            {% csrf_token %}
+            {{ list_form.title }}
+            <button type="submit" class="btn btn-ghost btn-sm">+ Agregar lista</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trello Clone{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="{% url 'board_list' %}">&#9632; Trello Clone</a>
+        </div>
+        {% if user.is_authenticated %}
+        <div class="nav-links">
+            <a href="{% url 'board_list' %}">Tableros</a>
+            <a href="{% url 'profile' %}">{{ user.username }}</a>
+            <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost">Salir</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="nav-links">
+            <a href="{% url 'login' %}">Iniciar sesión</a>
+            <a href="{% url 'register' %}" class="btn btn-primary">Registrarse</a>
+        </div>
+        {% endif %}
+    </nav>
+
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

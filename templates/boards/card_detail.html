@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}{{ card.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'board_detail' board.pk %}" class="breadcrumb">
+            &#8592; {{ board.title }} / {{ card.list.title }}
+        </a>
+        <h1>Editar tarjeta</h1>
+    </div>
+    <form method="post" action="{% url 'card_delete' card.pk %}"
+          onsubmit="return confirm('¿Eliminar esta tarjeta?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Eliminar tarjeta</button>
+    </form>
+</div>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="field-errors">
+                {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a href="{% url 'board_detail' board.pk %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </form>
+
+    <div class="card-info">
+        <p><small>Creada: {{ card.created_at|date:"d/m/Y H:i" }}</small></p>
+        <p><small>Actualizada: {{ card.updated_at|date:"d/m/Y H:i" }}</small></p>
+    </div>
+</div>
+{% endblock %}

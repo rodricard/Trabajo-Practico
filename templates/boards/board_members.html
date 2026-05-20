@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Miembros - {{ board.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'board_detail' board.pk %}" class="breadcrumb">&#8592; {{ board.title }}</a>
+        <h1>Miembros del tablero</h1>
+    </div>
+</div>
+
+<div class="members-layout">
+    <div class="card">
+        <h2>Agregar miembro</h2>
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <ul class="field-errors">
+                    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Agregar</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Miembros actuales</h2>
+        <ul class="members-list">
+            {% for member in members %}
+            <li class="member-item">
+                <div class="member-info">
+                    <span class="member-avatar">{{ member.user.username|first|upper }}</span>
+                    <div>
+                        <strong>{{ member.user.username }}</strong>
+                        <small>{{ member.get_role_display }}</small>
+                    </div>
+                </div>
+                {% if member.role != 'owner' %}
+                <form method="post" action="{% url 'board_member_remove' board.pk member.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('¿Eliminar a {{ member.user.username }}?')">
+                        Eliminar
+                    </button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

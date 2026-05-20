@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Mis tableros{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Mis tableros</h1>
+    <a href="{% url 'board_create' %}" class="btn btn-primary">+ Nuevo tablero</a>
+</div>
+
+{% if owned_boards %}
+<section>
+    <h2 class="section-title">Propios</h2>
+    <div class="boards-grid">
+        {% for board in owned_boards %}
+        <a href="{% url 'board_detail' board.pk %}" class="board-card" style="background-color: {{ board.background_color }};">
+            <span class="board-title">{{ board.title }}</span>
+            <span class="board-badge">Propietario</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if member_boards %}
+<section>
+    <h2 class="section-title">Compartidos conmigo</h2>
+    <div class="boards-grid">
+        {% for board in member_boards %}
+        <a href="{% url 'board_detail' board.pk %}" class="board-card" style="background-color: {{ board.background_color }};">
+            <span class="board-title">{{ board.title }}</span>
+            <span class="board-badge">{{ board.owner.username }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if not owned_boards and not member_boards %}
+<div class="empty-state-large">
+    <p>No tienes tableros todavía.</p>
+    <a href="{% url 'board_create' %}" class="btn btn-primary">Crear primer tablero</a>
+</div>
+{% endif %}
+{% endblock %}

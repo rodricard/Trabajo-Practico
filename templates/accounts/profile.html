@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Perfil - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Mi perfil</h1>
+</div>
+
+<div class="profile-grid">
+    <div class="card">
+        <h2>Información</h2>
+        <p><strong>Usuario:</strong> {{ user.username }}</p>
+        <p><strong>Correo:</strong> {{ user.email }}</p>
+        <p><strong>Miembro desde:</strong> {{ user.date_joined|date:"d/m/Y" }}</p>
+        <hr>
+        <p><strong>Tableros propios:</strong> {{ owned_count }}</p>
+        <p><strong>Tableros como miembro:</strong> {{ member_count }}</p>
+    </div>
+
+    <div class="card">
+        <h2>Tarjetas asignadas</h2>
+        {% if assigned_cards %}
+        <ul class="card-list">
+            {% for card in assigned_cards %}
+            <li>
+                <a href="{% url 'card_detail' card.pk %}">{{ card.title }}</a>
+                <small>en {{ card.list.board.title }} / {{ card.list.title }}</small>
+                {% if card.due_date %}
+                <span class="badge {% if card.due_date < today %}badge-danger{% endif %}">
+                    {{ card.due_date|date:"d/m/Y" }}
+                </span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">No tienes tarjetas asignadas.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
