@@ -12,14 +12,37 @@
         <div class="nav-brand">
             <a href="{% url 'board_list' %}">&#9632; Trello Clone</a>
         </div>
+
         {% if user.is_authenticated %}
         <div class="nav-links">
             <a href="{% url 'board_list' %}">Tableros</a>
-            <a href="{% url 'profile' %}">{{ user.username }}</a>
-            <form method="post" action="{% url 'logout' %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-ghost">Salir</button>
-            </form>
+
+            <div class="nav-dropdown">
+                <button class="nav-avatar-btn" id="dropdownToggle">
+                    <span class="nav-avatar-circle">{{ user.username|first|upper }}</span>
+                    <span class="nav-username">{{ user.username }}</span>
+                    <span class="nav-chevron">&#9660;</span>
+                </button>
+                <div class="nav-dropdown-menu" id="dropdownMenu">
+                    <div class="dropdown-header">
+                        <span class="dropdown-avatar">{{ user.username|first|upper }}</span>
+                        <div>
+                            <strong>{{ user.username }}</strong>
+                            <small>{{ user.email }}</small>
+                        </div>
+                    </div>
+                    <hr class="dropdown-divider">
+                    <a href="{% url 'profile' %}" class="dropdown-item">&#128100; &nbsp;Mi perfil</a>
+                    <a href="{% url 'board_list' %}" class="dropdown-item">&#9632; &nbsp;Mis tableros</a>
+                    <hr class="dropdown-divider">
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item dropdown-item--logout">
+                            &#128682; &nbsp;Cerrar sesión
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
         {% else %}
         <div class="nav-links">
@@ -40,5 +63,22 @@
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
+
+    <script>
+        const toggle = document.getElementById('dropdownToggle');
+        const menu   = document.getElementById('dropdownMenu');
+        if (toggle && menu) {
+            toggle.addEventListener('click', function(e) {
+                e.stopPropagation();
+                menu.classList.toggle('open');
+                toggle.classList.toggle('active');
+            });
+            document.addEventListener('click', function() {
+                menu.classList.remove('open');
+                toggle.classList.remove('active');
+            });
+            menu.addEventListener('click', function(e) { e.stopPropagation(); });
+        }
+    </script>
 </body>
 </html>

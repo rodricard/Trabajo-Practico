@@ -2,6 +2,53 @@
 {% block title %}Mis tableros{% endblock %}
 
 {% block content %}
+
+{% if today_cards or pending_cards %}
+<div class="tasks-panel">
+
+    {% if today_cards %}
+    <div class="tasks-section tasks-today">
+        <div class="tasks-section-header">
+            <span class="tasks-icon">&#128197;</span>
+            <h2>Vencen hoy <span class="tasks-count tasks-count-danger">{{ today_cards|length }}</span></h2>
+        </div>
+        <div class="tasks-list">
+            {% for card in today_cards %}
+            <a href="{% url 'card_detail' card.pk %}" class="task-item task-item-today">
+                <div class="task-info">
+                    <span class="task-title">{{ card.title }}</span>
+                    <span class="task-board">{{ card.list.board.title }} &rsaquo; {{ card.list.title }}</span>
+                </div>
+                <span class="task-badge task-badge-danger">Hoy</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if pending_cards %}
+    <div class="tasks-section tasks-pending">
+        <div class="tasks-section-header">
+            <span class="tasks-icon">&#9200;</span>
+            <h2>Pendientes próximas <span class="tasks-count">{{ pending_cards|length }}</span></h2>
+        </div>
+        <div class="tasks-list">
+            {% for card in pending_cards %}
+            <a href="{% url 'card_detail' card.pk %}" class="task-item">
+                <div class="task-info">
+                    <span class="task-title">{{ card.title }}</span>
+                    <span class="task-board">{{ card.list.board.title }} &rsaquo; {{ card.list.title }}</span>
+                </div>
+                <span class="task-badge">{{ card.due_date|date:"d/m/Y" }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}
+
 <div class="page-header">
     <h1>Mis tableros</h1>
     <a href="{% url 'board_create' %}" class="btn btn-primary">+ Nuevo tablero</a>
@@ -12,7 +59,7 @@
     <h2 class="section-title">Propios</h2>
     <div class="boards-grid">
         {% for board in owned_boards %}
-        <a href="{% url 'board_detail' board.pk %}" class="board-card" style="background-color: {{ board.background_color }};">
+        <a href="{% url 'board_detail' board.pk %}" class="board-card" data-color="{{ board.background_color }}">
             <span class="board-title">{{ board.title }}</span>
             <span class="board-badge">Propietario</span>
         </a>
@@ -26,7 +73,7 @@
     <h2 class="section-title">Compartidos conmigo</h2>
     <div class="boards-grid">
         {% for board in member_boards %}
-        <a href="{% url 'board_detail' board.pk %}" class="board-card" style="background-color: {{ board.background_color }};">
+        <a href="{% url 'board_detail' board.pk %}" class="board-card" data-color="{{ board.background_color }}">
             <span class="board-title">{{ board.title }}</span>
             <span class="board-badge">{{ board.owner.username }}</span>
         </a>
@@ -41,4 +88,9 @@
     <a href="{% url 'board_create' %}" class="btn btn-primary">Crear primer tablero</a>
 </div>
 {% endif %}
+<script>
+    document.querySelectorAll('.board-card[data-color]').forEach(function(el) {
+        el.style.backgroundColor = el.getAttribute('data-color');
+    });
+</script>
 {% endblock %}
