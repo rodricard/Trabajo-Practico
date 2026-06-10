@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.http import HttpResponseForbidden
+from django.utils import timezone
 
 from .models import Board, BoardMember, List, Card
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
@@ -20,9 +21,25 @@ def _is_owner(user, board):
 def board_list(request):
     owned = Board.objects.filter(owner=request.user)
     member_of = Board.objects.filter(board_members__user=request.user).exclude(owner=request.user)
+
+    today = timezone.localdate()
+
+    today_cards = Card.objects.filter(
+        assigned_to=request.user,
+        due_date=today,
+    ).select_related('list__board').order_by('list__board__title')
+
+    pending_cards = Card.objects.filter(
+        assigned_to=request.user,
+        due_date__gt=today,
+    ).select_related('list__board').order_by('due_date')[:10]
+
     return render(request, 'boards/board_list.html', {
         'owned_boards': owned,
         'member_boards': member_of,
+        'today_cards': today_cards,
+        'pending_cards': pending_cards,
+        'today': today,
     })
 
 
