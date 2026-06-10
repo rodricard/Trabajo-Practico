@@ -151,6 +151,18 @@ def board_member_remove(request, board_pk, member_pk):
 
 
 @login_required
+def list_update(request, pk):
+    lst = get_object_or_404(List, pk=pk)
+    if not _is_member(request.user, lst.board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        form = ListForm(request.POST, instance=lst)
+        if form.is_valid():
+            form.save()
+    return redirect('board_detail', pk=lst.board.pk)
+
+
+@login_required
 def list_create(request, board_pk):
     board = get_object_or_404(Board, pk=board_pk)
     if not _is_member(request.user, board):
@@ -198,9 +210,11 @@ def card_detail(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     board_users = User.objects.filter(board_memberships__board=board)
+    board_lists = board.lists.all()
     if request.method == 'POST':
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
         if form.is_valid():
             form.save()
             messages.success(request, 'Tarjeta actualizada.')
@@ -208,6 +222,7 @@ def card_detail(request, pk):
     else:
         form = CardForm(instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
     return render(request, 'boards/card_detail.html', {
         'card': card,
         'board': board,

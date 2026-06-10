@@ -521,6 +521,21 @@ a { color: inherit; text-decoration: none; }
 .list-header h3 { font-size: .9rem; font-weight: 700; color: #172b4d; }
 .list-header:hover .btn-icon { opacity: 1; }
 
+.list-title-form { flex: 1; }
+.list-title-input {
+    width: 100%;
+    font-size: .9rem;
+    font-weight: 700;
+    color: #172b4d;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    padding: .15rem .3rem;
+    cursor: pointer;
+}
+.list-title-input:hover { border-color: #dfe1e6; background: #fff; cursor: text; }
+.list-title-input:focus { outline: none; border-color: #0079bf; background: #fff; cursor: text; }
+
 .cards-container { display: flex; flex-direction: column; gap: .4rem; }
 
 .card-item {
