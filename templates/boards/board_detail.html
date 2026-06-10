@@ -20,7 +20,10 @@
     {% for lst in lists %}
     <div class="kanban-list">
         <div class="list-header">
-            <h3>{{ lst.title }}</h3>
+            <form method="post" action="{% url 'list_update' lst.pk %}" class="list-title-form">
+                {% csrf_token %}
+                <input type="text" name="title" value="{{ lst.title }}" class="list-title-input" required>
+            </form>
             <form method="post" action="{% url 'list_delete' lst.pk %}"
                   onsubmit="return confirm('¿Eliminar lista y sus tarjetas?')">
                 {% csrf_token %}
@@ -64,4 +67,21 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.list-title-input').forEach(function(input) {
+    var original = input.value;
+    input.addEventListener('blur', function() {
+        if (input.value.trim() && input.value !== original) {
+            input.form.submit();
+        }
+    });
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { input.value = original; input.blur(); }
+    });
+});
+</script>
 {% endblock %}
