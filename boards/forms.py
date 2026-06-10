@@ -31,12 +31,13 @@ class ListForm(forms.ModelForm):
 class CardForm(forms.ModelForm):
     class Meta:
         model = Card
-        fields = ['title', 'description', 'due_date', 'assigned_to']
+        fields = ['title', 'description', 'due_date', 'assigned_to', 'list']
         labels = {
             'title': 'Título',
             'description': 'Descripción',
             'due_date': 'Fecha límite',
             'assigned_to': 'Asignado a',
+            'list': 'Lista',
         }
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'Título de la tarjeta'}),
