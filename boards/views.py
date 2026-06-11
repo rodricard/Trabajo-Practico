@@ -2,8 +2,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from .models import Board, BoardMember, List, Card
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
@@ -17,29 +18,41 @@ def _is_owner(user, board):
     return board.owner == user
 
 
+def _is_board_admin(user, board):
+    return board.board_members.filter(user=user, role__in=['owner', 'admin']).exists()
+
+
 @login_required
 def board_list(request):
     owned = Board.objects.filter(owner=request.user)
     member_of = Board.objects.filter(board_members__user=request.user).exclude(owner=request.user)
 
     today = timezone.localdate()
+    mis_cards = Card.objects.filter(assigned_to=request.user)
 
-    today_cards = Card.objects.filter(
-        assigned_to=request.user,
-        due_date=today,
+    total       = mis_cards.count()
+    pendientes  = mis_cards.filter(status='pendiente').count()
+    en_proceso  = mis_cards.filter(status='en_proceso').count()
+    completados = mis_cards.filter(status='completado').count()
+
+    today_cards = mis_cards.filter(
+        due_date=today
     ).select_related('list__board').order_by('list__board__title')
 
-    pending_cards = Card.objects.filter(
-        assigned_to=request.user,
-        due_date__gt=today,
+    pending_cards = mis_cards.filter(
+        due_date__gt=today
     ).select_related('list__board').order_by('due_date')[:10]
 
     return render(request, 'boards/board_list.html', {
-        'owned_boards': owned,
+        'owned_boards':  owned,
         'member_boards': member_of,
-        'today_cards': today_cards,
+        'today_cards':   today_cards,
         'pending_cards': pending_cards,
-        'today': today,
+        'today':         today,
+        'total':         total,
+        'pendientes':    pendientes,
+        'en_proceso':    en_proceso,
+        'completados':   completados,
     })
 
 
@@ -65,18 +78,19 @@ def board_detail(request, pk):
         return HttpResponseForbidden('No tienes acceso a este tablero.')
     lists = board.lists.prefetch_related('cards__assigned_to').all()
     return render(request, 'boards/board_detail.html', {
-        'board': board,
-        'lists': lists,
-        'list_form': ListForm(),
-        'card_form': CardQuickForm(),
-        'is_owner': _is_owner(request.user, board),
+        'board':          board,
+        'lists':          lists,
+        'list_form':      ListForm(),
+        'card_form':      CardQuickForm(),
+        'is_owner':       _is_owner(request.user, board),
+        'is_board_admin': _is_board_admin(request.user, board),
     })
 
 
 @login_required
 def board_update(request, pk):
     board = get_object_or_404(Board, pk=pk)
-    if not _is_owner(request.user, board):
+    if not _is_board_admin(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
         form = BoardForm(request.POST, instance=board)
@@ -87,8 +101,8 @@ def board_update(request, pk):
     else:
         form = BoardForm(instance=board)
     return render(request, 'boards/board_form.html', {
-        'form': form,
-        'board': board,
+        'form':         form,
+        'board':        board,
         'action_label': 'Guardar cambios',
     })
 
@@ -108,7 +122,7 @@ def board_delete(request, pk):
 @login_required
 def board_members(request, pk):
     board = get_object_or_404(Board, pk=pk)
-    if not _is_owner(request.user, board):
+    if not _is_board_admin(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
         form = BoardMemberForm(request.POST)
@@ -129,21 +143,24 @@ def board_members(request, pk):
         form = BoardMemberForm()
     members = board.board_members.select_related('user').all()
     return render(request, 'boards/board_members.html', {
-        'board': board,
-        'members': members,
-        'form': form,
+        'board':          board,
+        'members':        members,
+        'form':           form,
+        'is_owner':       _is_owner(request.user, board),
     })
 
 
 @login_required
 def board_member_remove(request, board_pk, member_pk):
     board = get_object_or_404(Board, pk=board_pk)
-    if not _is_owner(request.user, board):
+    if not _is_board_admin(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
         member = get_object_or_404(BoardMember, pk=member_pk, board=board)
         if member.role == 'owner':
             messages.error(request, 'No puedes eliminar al propietario.')
+        elif member.role == 'admin' and not _is_owner(request.user, board):
+            messages.error(request, 'Solo el propietario puede eliminar administradores.')
         else:
             member.delete()
             messages.success(request, 'Miembro eliminado.')
@@ -151,15 +168,20 @@ def board_member_remove(request, board_pk, member_pk):
 
 
 @login_required
-def list_update(request, pk):
-    lst = get_object_or_404(List, pk=pk)
-    if not _is_member(request.user, lst.board):
-        return HttpResponseForbidden()
-    if request.method == 'POST':
-        form = ListForm(request.POST, instance=lst)
-        if form.is_valid():
-            form.save()
-    return redirect('board_detail', pk=lst.board.pk)
+@require_POST
+def api_member_set_role(request, board_pk, member_pk):
+    board = get_object_or_404(Board, pk=board_pk)
+    if not _is_owner(request.user, board):
+        return JsonResponse({'error': 'Solo el propietario puede cambiar roles.'}, status=403)
+    member = get_object_or_404(BoardMember, pk=member_pk, board=board)
+    if member.role == 'owner':
+        return JsonResponse({'error': 'No puedes cambiar el rol del propietario.'}, status=400)
+    role = request.POST.get('role')
+    if role not in ['admin', 'member']:
+        return JsonResponse({'error': 'Rol inválido.'}, status=400)
+    member.role = role
+    member.save()
+    return JsonResponse({'ok': True, 'role': role, 'role_display': member.get_role_display()})
 
 
 @login_required
@@ -210,11 +232,9 @@ def card_detail(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     board_users = User.objects.filter(board_memberships__board=board)
-    board_lists = board.lists.all()
     if request.method == 'POST':
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
-        form.fields['list'].queryset = board_lists
         if form.is_valid():
             form.save()
             messages.success(request, 'Tarjeta actualizada.')
@@ -222,11 +242,10 @@ def card_detail(request, pk):
     else:
         form = CardForm(instance=card)
         form.fields['assigned_to'].queryset = board_users
-        form.fields['list'].queryset = board_lists
     return render(request, 'boards/card_detail.html', {
-        'card': card,
-        'board': board,
-        'form': form,
+        'card':     card,
+        'board':    board,
+        'form':     form,
         'is_owner': _is_owner(request.user, board),
     })
 
