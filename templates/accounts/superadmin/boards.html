@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Todos los tableros — Superadmin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'superadmin_dashboard' %}" class="breadcrumb">&#8592; Panel superadmin</a>
+        <h1>Todos los tableros</h1>
+    </div>
+</div>
+
+<div class="admin-table-container">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Tablero</th>
+                <th>Propietario</th>
+                <th>Miembros</th>
+                <th>Creado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for board in boards %}
+            <tr>
+                <td>
+                    <span class="board-color-dot" style="background:{{ board.background_color }}"></span>
+                    {{ board.title }}
+                </td>
+                <td>{{ board.owner.username }}</td>
+                <td>{{ board.board_members.count }}</td>
+                <td>{{ board.created_at|date:"d/m/Y" }}</td>
+                <td>
+                    <a href="{% url 'board_detail' board.pk %}" class="btn btn-sm btn-ghost">Ver tablero</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="empty-state" style="padding:1rem">No hay tableros.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

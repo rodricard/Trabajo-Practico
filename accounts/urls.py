@@ -11,4 +11,10 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('register/', views.register, name='register'),
     path('profile/', views.profile, name='profile'),
+    # Superadmin
+    path('superadmin/', views.superadmin_dashboard, name='superadmin_dashboard'),
+    path('superadmin/boards/', views.superadmin_boards, name='superadmin_boards'),
+    path('superadmin/stats/', views.api_superadmin_stats, name='api_superadmin_stats'),
+    path('superadmin/users/<int:user_id>/toggle-active/', views.api_toggle_user_active, name='api_toggle_user_active'),
+    path('superadmin/users/<int:user_id>/toggle-superadmin/', views.superadmin_toggle_superadmin, name='superadmin_toggle_superadmin'),
 ]
