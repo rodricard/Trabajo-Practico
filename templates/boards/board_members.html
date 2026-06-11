@@ -33,26 +33,67 @@
         <h2>Miembros actuales</h2>
         <ul class="members-list">
             {% for member in members %}
-            <li class="member-item">
+            <li class="member-item" id="member-item-{{ member.pk }}">
                 <div class="member-info">
                     <span class="member-avatar">{{ member.user.username|first|upper }}</span>
                     <div>
                         <strong>{{ member.user.username }}</strong>
-                        <small>{{ member.get_role_display }}</small>
+                        <small>
+                            <span class="role-badge role-badge--{{ member.role }}" id="role-badge-{{ member.pk }}">
+                                {{ member.get_role_display }}
+                            </span>
+                        </small>
                     </div>
                 </div>
-                {% if member.role != 'owner' %}
-                <form method="post" action="{% url 'board_member_remove' board.pk member.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            onclick="return confirm('¿Eliminar a {{ member.user.username }}?')">
-                        Eliminar
-                    </button>
-                </form>
-                {% endif %}
+                <div class="member-actions">
+                    {% if member.role != 'owner' %}
+                        {% if is_owner %}
+                        <select class="role-select" data-member-id="{{ member.pk }}"
+                                data-url="{% url 'api_member_set_role' board.pk member.pk %}">
+                            <option value="member" {% if member.role == 'member' %}selected{% endif %}>Miembro</option>
+                            <option value="admin"  {% if member.role == 'admin'  %}selected{% endif %}>Admin</option>
+                        </select>
+                        {% endif %}
+                        <form method="post" action="{% url 'board_member_remove' board.pk member.pk %}" style="display:inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm"
+                                    onclick="return confirm('&#191;Eliminar a {{ member.user.username }}?')">
+                                Eliminar
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
             </li>
             {% endfor %}
         </ul>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_owner %}
+<script>
+const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+const ROLE_LABELS = { member: 'Miembro', admin: 'Administrador' };
+const ROLE_CLASSES = { member: 'role-badge--member', admin: 'role-badge--admin', owner: 'role-badge--owner' };
+
+document.querySelectorAll('.role-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+        const memberId = this.dataset.memberId;
+        const url      = this.dataset.url;
+        const role     = this.value;
+        const body     = new URLSearchParams({ role });
+
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf }, body })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) { alert(data.error); return; }
+                const badge = document.getElementById('role-badge-' + memberId);
+                badge.textContent = ROLE_LABELS[data.role] || data.role_display;
+                badge.className   = 'role-badge ' + (ROLE_CLASSES[data.role] || '');
+            });
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

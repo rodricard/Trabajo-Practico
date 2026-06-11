@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-
 class Board(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -21,6 +20,7 @@ class Board(models.Model):
 class BoardMember(models.Model):
     ROLE_CHOICES = [
         ('owner', 'Propietario'),
+        ('admin', 'Administrador'),
         ('member', 'Miembro'),
     ]
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='board_members')
@@ -49,10 +49,17 @@ class List(models.Model):
 
 
 class Card(models.Model):
+    STATUS_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('en_proceso', 'En proceso'),
+        ('completado', 'Completado'),
+    ]
+
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     list = models.ForeignKey(List, on_delete=models.CASCADE, related_name='cards')
     position = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendiente')
     assigned_to = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_cards'
     )

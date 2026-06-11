@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Panel Superadmin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Panel Superadmin</h1>
+    <a href="{% url 'superadmin_boards' %}" class="btn btn-ghost">&#128203; Ver todos los tableros</a>
+</div>
+
+<!-- Stats (cargadas via AJAX) -->
+<div class="summary-cards">
+    <div class="summary-card summary-card--total">
+        <span class="summary-icon">&#128101;</span>
+        <div>
+            <span class="summary-value" id="stat-total-users">&#8212;</span>
+            <span class="summary-label">Usuarios totales</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--pendiente">
+        <span class="summary-icon">&#9989;</span>
+        <div>
+            <span class="summary-value" id="stat-active-users">&#8212;</span>
+            <span class="summary-label">Usuarios activos</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--proceso">
+        <span class="summary-icon">&#128203;</span>
+        <div>
+            <span class="summary-value" id="stat-total-boards">&#8212;</span>
+            <span class="summary-label">Tableros</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--completado">
+        <span class="summary-icon">&#128196;</span>
+        <div>
+            <span class="summary-value" id="stat-total-cards">&#8212;</span>
+            <span class="summary-label">Tarjetas totales</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de usuarios -->
+<h2 class="section-title">Gesti&#243;n de usuarios</h2>
+<div class="admin-table-container">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Rol global</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr id="user-row-{{ u.pk }}" class="{% if not u.is_active %}row-inactive{% endif %}">
+                <td>
+                    <div class="member-info">
+                        <span class="member-avatar">{{ u.username|first|upper }}</span>
+                        <strong>{{ u.username }}</strong>
+                    </div>
+                </td>
+                <td>{{ u.email|default:"—" }}</td>
+                <td>
+                    {% if u.profile.is_superadmin %}
+                    <span class="role-badge role-badge--superadmin">Superadmin</span>
+                    {% else %}
+                    <span class="role-badge role-badge--member">Usuario</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="status-badge {% if u.is_active %}status-active{% else %}status-inactive{% endif %}"
+                          id="status-badge-{{ u.pk }}">
+                        {% if u.is_active %}Activo{% else %}Inactivo{% endif %}
+                    </span>
+                </td>
+                <td class="actions-cell">
+                    {% if u != request.user %}
+                    <button class="btn btn-sm btn-ghost toggle-active-btn"
+                            id="toggle-btn-{{ u.pk }}"
+                            data-user-id="{{ u.pk }}"
+                            data-url="{% url 'api_toggle_user_active' u.pk %}">
+                        {% if u.is_active %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                    <form method="post" action="{% url 'superadmin_toggle_superadmin' u.pk %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm {% if u.profile.is_superadmin %}btn-danger{% else %}btn-primary{% endif %}">
+                            {% if u.profile.is_superadmin %}Quitar superadmin{% else %}Hacer superadmin{% endif %}
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="empty-state">(t&#250;)</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="empty-state" style="padding:1rem">No hay usuarios.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Cargar estadísticas
+fetch("{% url 'api_superadmin_stats' %}")
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('stat-total-users').textContent  = data.total_users;
+        document.getElementById('stat-active-users').textContent = data.active_users;
+        document.getElementById('stat-total-boards').textContent = data.total_boards;
+        document.getElementById('stat-total-cards').textContent  = data.total_cards;
+    });
+
+// Toggle activo/inactivo
+const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+document.querySelectorAll('.toggle-active-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const uid  = this.dataset.userId;
+        const url  = this.dataset.url;
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.ok) return;
+                const row    = document.getElementById('user-row-' + uid);
+                const badge  = document.getElementById('status-badge-' + uid);
+                const toggleBtn = document.getElementById('toggle-btn-' + uid);
+                if (data.is_active) {
+                    row.classList.remove('row-inactive');
+                    badge.textContent = 'Activo';
+                    badge.className   = 'status-badge status-active';
+                    toggleBtn.textContent = 'Desactivar';
+                } else {
+                    row.classList.add('row-inactive');
+                    badge.textContent = 'Inactivo';
+                    badge.className   = 'status-badge status-inactive';
+                    toggleBtn.textContent = 'Activar';
+                }
+            });
+    });
+});
+</script>
+{% endblock %}
