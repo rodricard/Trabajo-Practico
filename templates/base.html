@@ -8,49 +8,76 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">
-            <a href="{% url 'board_list' %}">&#9632; Trello Clone</a>
-        </div>
 
+<nav class="topbar">
+    <div class="topbar-left">
         {% if user.is_authenticated %}
-        <div class="nav-links">
-            <a href="{% url 'board_list' %}">Tableros</a>
+        <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+        {% endif %}
+        <a href="{% url 'board_list' %}" class="topbar-brand">&#9632; Trello Clone</a>
+    </div>
 
-            <div class="nav-dropdown">
-                <button class="nav-avatar-btn" id="dropdownToggle">
-                    <span class="nav-avatar-circle">{{ user.username|first|upper }}</span>
-                    <span class="nav-username">{{ user.username }}</span>
-                    <span class="nav-chevron">&#9660;</span>
-                </button>
-                <div class="nav-dropdown-menu" id="dropdownMenu">
-                    <div class="dropdown-header">
-                        <span class="dropdown-avatar">{{ user.username|first|upper }}</span>
-                        <div>
-                            <strong>{{ user.username }}</strong>
-                            <small>{{ user.email }}</small>
-                        </div>
+    {% if user.is_authenticated %}
+    <div class="topbar-right">
+        <div class="nav-dropdown">
+            <button class="nav-avatar-btn" id="dropdownToggle">
+                <span class="nav-avatar-circle">{{ user.username|first|upper }}</span>
+                <span class="nav-username">{{ user.username }}</span>
+                <span class="nav-chevron">&#9660;</span>
+            </button>
+            <div class="nav-dropdown-menu" id="dropdownMenu">
+                <div class="dropdown-header">
+                    <span class="dropdown-avatar">{{ user.username|first|upper }}</span>
+                    <div>
+                        <strong>{{ user.username }}</strong>
+                        <small>{{ user.email }}</small>
                     </div>
-                    <hr class="dropdown-divider">
-                    <a href="{% url 'profile' %}" class="dropdown-item">&#128100; &nbsp;Mi perfil</a>
-                    <a href="{% url 'board_list' %}" class="dropdown-item">&#9632; &nbsp;Mis tableros</a>
-                    <hr class="dropdown-divider">
-                    <form method="post" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="dropdown-item dropdown-item--logout">
-                            &#128682; &nbsp;Cerrar sesión
-                        </button>
-                    </form>
                 </div>
+                <hr class="dropdown-divider">
+                <a href="{% url 'profile' %}" class="dropdown-item">&#128100; &nbsp;Mi perfil</a>
+                <a href="{% url 'board_list' %}" class="dropdown-item">&#9632; &nbsp;Mis tableros</a>
+                <hr class="dropdown-divider">
+                <form method="post" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item dropdown-item--logout">
+                        &#128682; &nbsp;Cerrar sesión
+                    </button>
+                </form>
             </div>
         </div>
-        {% else %}
-        <div class="nav-links">
-            <a href="{% url 'login' %}">Iniciar sesión</a>
-            <a href="{% url 'register' %}" class="btn btn-primary">Registrarse</a>
-        </div>
-        {% endif %}
-    </nav>
+    </div>
+    {% else %}
+    <div class="topbar-right">
+        <a href="{% url 'login' %}" class="topbar-link">Iniciar sesión</a>
+        <a href="{% url 'register' %}" class="btn btn-primary">Registrarse</a>
+    </div>
+    {% endif %}
+</nav>
+
+{% if user.is_authenticated %}
+<aside class="sidebar" id="sidebar">
+    <a href="{% url 'board_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#127968;</span>
+        <span class="sidebar-label">Inicio</span>
+    </a>
+    <a href="{% url 'profile' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128100;</span>
+        <span class="sidebar-label">Perfil</span>
+    </a>
+    <a href="{% url 'board_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128203;</span>
+        <span class="sidebar-label">Tareas</span>
+    </a>
+    {% if user.profile.is_superadmin %}
+    <a href="{% url 'superadmin_dashboard' %}" class="sidebar-item sidebar-item--admin">
+        <span class="sidebar-icon">&#9881;</span>
+        <span class="sidebar-label">Superadmin</span>
+    </a>
+    {% endif %}
+</aside>
+{% endif %}
+
+<div class="page-wrapper {% if user.is_authenticated %}page-wrapper--sidebar{% endif %}" id="pageWrapper">
 
     {% if messages %}
     <div class="messages-container">
@@ -63,23 +90,34 @@
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
+</div>
 
-    <script>
-        const toggle = document.getElementById('dropdownToggle');
-        const menu   = document.getElementById('dropdownMenu');
-        if (toggle && menu) {
-            toggle.addEventListener('click', function(e) {
-                e.stopPropagation();
-                menu.classList.toggle('open');
-                toggle.classList.toggle('active');
-            });
-            document.addEventListener('click', function() {
-                menu.classList.remove('open');
-                toggle.classList.remove('active');
-            });
-            menu.addEventListener('click', function(e) { e.stopPropagation(); });
-        }
-    </script>
-    {% block extra_js %}{% endblock %}
+<script>
+    const toggle = document.getElementById('dropdownToggle');
+    const menu   = document.getElementById('dropdownMenu');
+    if (toggle && menu) {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            menu.classList.toggle('open');
+            toggle.classList.toggle('active');
+        });
+        document.addEventListener('click', function() {
+            menu.classList.remove('open');
+            toggle.classList.remove('active');
+        });
+        menu.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar       = document.getElementById('sidebar');
+    const pageWrapper   = document.getElementById('pageWrapper');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('expanded');
+            pageWrapper.classList.toggle('sidebar-expanded');
+        });
+    }
+</script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

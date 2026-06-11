@@ -3,9 +3,39 @@
 
 {% block content %}
 
+<div class="summary-cards">
+    <div class="summary-card summary-card--total">
+        <span class="summary-icon">&#128203;</span>
+        <div>
+            <span class="summary-value">{{ total }}</span>
+            <span class="summary-label">Actividades</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--pendiente">
+        <span class="summary-icon">&#9200;</span>
+        <div>
+            <span class="summary-value">{{ pendientes }}</span>
+            <span class="summary-label">Pendientes</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--proceso">
+        <span class="summary-icon">&#9881;</span>
+        <div>
+            <span class="summary-value">{{ en_proceso }}</span>
+            <span class="summary-label">En proceso</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--completado">
+        <span class="summary-icon">&#10003;</span>
+        <div>
+            <span class="summary-value">{{ completados }}</span>
+            <span class="summary-label">Completados</span>
+        </div>
+    </div>
+</div>
+
 {% if today_cards or pending_cards %}
 <div class="tasks-panel">
-
     {% if today_cards %}
     <div class="tasks-section tasks-today">
         <div class="tasks-section-header">
@@ -45,7 +75,6 @@
         </div>
     </div>
     {% endif %}
-
 </div>
 {% endif %}
 
@@ -88,9 +117,11 @@
     <a href="{% url 'board_create' %}" class="btn btn-primary">Crear primer tablero</a>
 </div>
 {% endif %}
+
 <script>
     document.querySelectorAll('.board-card[data-color]').forEach(function(el) {
         el.style.backgroundColor = el.getAttribute('data-color');
     });
 </script>
+
 {% endblock %}
