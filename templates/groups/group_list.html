@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Grupos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Grupos de trabajo</h1>
+    <a href="{% url 'group_create' %}" class="btn btn-primary">+ Crear grupo</a>
+</div>
+
+{% if my_groups %}
+<h2 class="section-title">Mis grupos</h2>
+<div class="groups-grid">
+    {% for group in my_groups %}
+    <a href="{% url 'group_detail' group.pk %}" class="group-card">
+        <div class="group-card-icon">{{ group.name|first|upper }}</div>
+        <div class="group-card-info">
+            <strong>{{ group.name }}</strong>
+            <span>{{ group.group_members.count }} miembro{{ group.group_members.count|pluralize }}</span>
+        </div>
+        {% if group.is_chat_locked %}
+        <span class="group-locked-badge" title="Chat bloqueado">&#128274;</span>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if pending_groups %}
+<h2 class="section-title">Solicitudes enviadas</h2>
+<div class="groups-grid">
+    {% for group in pending_groups %}
+    <div class="group-card group-card--pending">
+        <div class="group-card-icon">{{ group.name|first|upper }}</div>
+        <div class="group-card-info">
+            <strong>{{ group.name }}</strong>
+            <span class="badge">Pendiente de aprobación</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if all_groups %}
+<h2 class="section-title">Otros grupos</h2>
+<div class="groups-grid">
+    {% for group in all_groups %}
+    <div class="group-card group-card--other">
+        <div class="group-card-icon">{{ group.name|first|upper }}</div>
+        <div class="group-card-info">
+            <strong>{{ group.name }}</strong>
+            {% if group.description %}
+            <span>{{ group.description|truncatechars:50 }}</span>
+            {% endif %}
+        </div>
+        <form method="post" action="{% url 'group_join' group.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary btn-sm">Solicitar ingreso</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if not my_groups and not pending_groups and not all_groups %}
+<div class="empty-state-large">
+    <p>No hay grupos todavía.</p>
+    <a href="{% url 'group_create' %}" class="btn btn-primary">Crear el primero</a>
+</div>
+{% endif %}
+{% endblock %}
