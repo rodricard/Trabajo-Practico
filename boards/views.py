@@ -6,8 +6,8 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Board, BoardMember, List, Card
-from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
+from .models import Board, BoardMember, List, Card, BoardMessage
+from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm, BoardMessageForm
 
 
 def _is_member(user, board):
@@ -76,15 +76,56 @@ def board_detail(request, pk):
     board = get_object_or_404(Board, pk=pk)
     if not _is_member(request.user, board):
         return HttpResponseForbidden('No tienes acceso a este tablero.')
+    is_admin = _is_board_admin(request.user, board)
+    can_write = is_admin or not board.is_chat_locked
     lists = board.lists.prefetch_related('cards__assigned_to').all()
+    chat_messages = board.chat_messages.select_related('user').all()
     return render(request, 'boards/board_detail.html', {
         'board':          board,
         'lists':          lists,
         'list_form':      ListForm(),
         'card_form':      CardQuickForm(),
         'is_owner':       _is_owner(request.user, board),
-        'is_board_admin': _is_board_admin(request.user, board),
+        'is_board_admin': is_admin,
+        'chat_messages':  chat_messages,
+        'message_form':   BoardMessageForm() if can_write else None,
+        'can_write':      can_write,
     })
+
+
+@login_required
+@require_POST
+def board_message_send(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if board.is_chat_locked and not _is_board_admin(request.user, board):
+        messages.error(request, 'El chat está bloqueado.')
+        return redirect('board_detail', pk=pk)
+    form = BoardMessageForm(request.POST)
+    if form.is_valid():
+        msg = form.save(commit=False)
+        msg.board = board
+        msg.user = request.user
+        msg.save()
+    return redirect('board_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def board_toggle_chat_lock(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_board_admin(request.user, board):
+        return HttpResponseForbidden()
+    board.is_chat_locked = not board.is_chat_locked
+    board.save()
+    BoardMessage.objects.create(
+        board=board, user=None, is_system=True,
+        content=f'{request.user.username} {"bloqueó" if board.is_chat_locked else "desbloqueó"} el chat.'
+    )
+    estado = 'bloqueado' if board.is_chat_locked else 'desbloqueado'
+    messages.success(request, f'Chat {estado}.')
+    return redirect('board_detail', pk=pk)
 
 
 @login_required

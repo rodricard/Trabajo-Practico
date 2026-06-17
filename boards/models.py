@@ -7,6 +7,7 @@ class Board(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_boards')
     members = models.ManyToManyField(User, through='BoardMember', related_name='boards')
     background_color = models.CharField(max_length=7, default='#0079bf')
+    is_chat_locked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -15,6 +16,20 @@ class Board(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class BoardMessage(models.Model):
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='chat_messages')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='board_messages')
+    content = models.TextField()
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'[{self.board.title}] {self.content[:40]}'
 
 
 class BoardMember(models.Model):

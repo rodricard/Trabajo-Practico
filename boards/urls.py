@@ -15,4 +15,6 @@ urlpatterns = [
     path('lists/<int:list_pk>/cards/create/', views.card_create, name='card_create'),
     path('cards/<int:pk>/', views.card_detail, name='card_detail'),
     path('cards/<int:pk>/delete/', views.card_delete, name='card_delete'),
+    path('<int:pk>/chat/enviar/', views.board_message_send, name='board_message_send'),
+    path('<int:pk>/chat/bloquear/', views.board_toggle_chat_lock, name='board_toggle_chat_lock'),
 ]
