@@ -9,6 +9,12 @@
             {% if is_board_admin %}
             <a href="{% url 'board_members' board.pk %}" class="btn btn-ghost-light">Miembros</a>
             <a href="{% url 'board_update' board.pk %}" class="btn btn-ghost-light">Configurar</a>
+            <form method="post" action="{% url 'board_toggle_chat_lock' board.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost-light">
+                    {% if board.is_chat_locked %}&#128275; Desbloquear chat{% else %}&#128274; Bloquear chat{% endif %}
+                </button>
+            </form>
             {% endif %}
             {% if is_owner %}
             <a href="{% url 'board_delete' board.pk %}" class="btn btn-ghost-light">Eliminar</a>
@@ -18,55 +24,109 @@
     </div>
 </div>
 
-<div class="kanban-board">
-    {% for lst in lists %}
-    <div class="kanban-list">
-        <div class="list-header">
-            <h3 class="list-title">{{ lst.title }}</h3>
-            <form method="post" action="{% url 'list_delete' lst.pk %}"
-                  onsubmit="return confirm('&#191;Eliminar lista y sus tarjetas?')">
-                {% csrf_token %}
-                <button type="submit" class="btn-icon" title="Eliminar lista">&times;</button>
-            </form>
+<div class="board-workspace">
+
+    <!-- Kanban -->
+    <div class="kanban-wrapper">
+        <div class="kanban-board">
+            {% for lst in lists %}
+            <div class="kanban-list">
+                <div class="list-header">
+                    <h3 class="list-title">{{ lst.title }}</h3>
+                    <form method="post" action="{% url 'list_delete' lst.pk %}"
+                          onsubmit="return confirm('&#191;Eliminar lista y sus tarjetas?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-icon" title="Eliminar lista">&times;</button>
+                    </form>
+                </div>
+
+                <div class="cards-container">
+                    {% for card in lst.cards.all %}
+                    <a href="{% url 'card_detail' card.pk %}" class="card-item">
+                        <span class="card-title">{{ card.title }}</span>
+                        <div class="card-meta">
+                            {% if card.due_date %}
+                            <span class="card-due">&#128197; {{ card.due_date|date:"d/m" }}</span>
+                            {% endif %}
+                            {% if card.assigned_to %}
+                            <span class="card-avatar" title="{{ card.assigned_to.username }}">
+                                {{ card.assigned_to.username|first|upper }}
+                            </span>
+                            {% endif %}
+                            {% if card.status != 'pendiente' %}
+                            <span class="card-status-dot card-status-dot--{{ card.status }}" title="{{ card.get_status_display }}"></span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% empty %}
+                    <p class="list-empty">Sin tarjetas</p>
+                    {% endfor %}
+                </div>
+
+                <form method="post" action="{% url 'card_create' lst.pk %}" class="add-card-form">
+                    {% csrf_token %}
+                    {{ card_form.title }}
+                    <button type="submit" class="btn btn-ghost btn-sm">+ Agregar tarjeta</button>
+                </form>
+            </div>
+            {% endfor %}
+
+            <div class="kanban-list kanban-list--add">
+                <form method="post" action="{% url 'list_create' board.pk %}">
+                    {% csrf_token %}
+                    {{ list_form.title }}
+                    <button type="submit" class="btn btn-ghost btn-sm">+ Agregar lista</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat del tablero -->
+    <div class="board-chat-panel">
+        <div class="chat-header">
+            <span>&#128172; Chat del tablero</span>
+            {% if board.is_chat_locked %}
+            <span class="badge badge-danger">&#128274; Bloqueado</span>
+            {% endif %}
         </div>
 
-        <div class="cards-container">
-            {% for card in lst.cards.all %}
-            <a href="{% url 'card_detail' card.pk %}" class="card-item">
-                <span class="card-title">{{ card.title }}</span>
-                <div class="card-meta">
-                    {% if card.due_date %}
-                    <span class="card-due">&#128197; {{ card.due_date|date:"d/m" }}</span>
-                    {% endif %}
-                    {% if card.assigned_to %}
-                    <span class="card-avatar" title="{{ card.assigned_to.username }}">
-                        {{ card.assigned_to.username|first|upper }}
-                    </span>
-                    {% endif %}
-                    {% if card.status != 'pendiente' %}
-                    <span class="card-status-dot card-status-dot--{{ card.status }}" title="{{ card.get_status_display }}"></span>
-                    {% endif %}
+        <div class="chat-messages" id="chatMessages">
+            {% for msg in chat_messages %}
+            <div class="chat-msg {% if msg.is_system %}chat-msg--system{% endif %}">
+                {% if msg.is_system %}
+                <span class="chat-system-text">&#9432; {{ msg.content }}</span>
+                <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
+                {% else %}
+                <div class="chat-msg-header">
+                    <span class="chat-avatar">{{ msg.user.username|first|upper }}</span>
+                    <strong>{{ msg.user.username }}</strong>
+                    <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
                 </div>
-            </a>
+                <p class="chat-text">{{ msg.content }}</p>
+                {% endif %}
+            </div>
             {% empty %}
-            <p class="list-empty">Sin tarjetas</p>
+            <p class="list-empty">Sin mensajes aún.</p>
             {% endfor %}
         </div>
 
-        <form method="post" action="{% url 'card_create' lst.pk %}" class="add-card-form">
+        {% if can_write %}
+        <form method="post" action="{% url 'board_message_send' board.pk %}" class="chat-input-form">
             {% csrf_token %}
-            {{ card_form.title }}
-            <button type="submit" class="btn btn-ghost btn-sm">+ Agregar tarjeta</button>
+            {{ message_form.content }}
+            <button type="submit" class="btn btn-primary btn-sm">&#10148;</button>
         </form>
+        {% else %}
+        <div class="chat-locked-notice">&#128274; Chat bloqueado por un administrador.</div>
+        {% endif %}
     </div>
-    {% endfor %}
 
-    <div class="kanban-list kanban-list--add">
-        <form method="post" action="{% url 'list_create' board.pk %}">
-            {% csrf_token %}
-            {{ list_form.title }}
-            <button type="submit" class="btn btn-ghost btn-sm">+ Agregar lista</button>
-        </form>
-    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const chatBox = document.getElementById('chatMessages');
+    if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+</script>
 {% endblock %}

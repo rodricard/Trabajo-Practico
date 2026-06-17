@@ -56,17 +56,24 @@
 
 {% if user.is_authenticated %}
 <aside class="sidebar" id="sidebar">
+    <a href="{% url 'group_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128101;</span>
+        <span class="sidebar-label">Grupos</span>
+    </a>
     <a href="{% url 'board_list' %}" class="sidebar-item">
-        <span class="sidebar-icon">&#127968;</span>
-        <span class="sidebar-label">Inicio</span>
+        <span class="sidebar-icon">&#128203;</span>
+        <span class="sidebar-label">Tableros</span>
+    </a>
+    <a href="{% url 'notifications_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128276;</span>
+        <span class="sidebar-label">
+            Notificaciones
+            {% if unread_notifications %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}
+        </span>
     </a>
     <a href="{% url 'profile' %}" class="sidebar-item">
         <span class="sidebar-icon">&#128100;</span>
         <span class="sidebar-label">Perfil</span>
-    </a>
-    <a href="{% url 'board_list' %}" class="sidebar-item">
-        <span class="sidebar-icon">&#128203;</span>
-        <span class="sidebar-label">Tareas</span>
     </a>
     {% if user.profile.is_superadmin %}
     <a href="{% url 'superadmin_dashboard' %}" class="sidebar-item sidebar-item--admin">

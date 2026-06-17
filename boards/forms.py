@@ -1,5 +1,5 @@
 from django import forms
-from .models import Board, List, Card
+from .models import Board, List, Card, BoardMessage
 
 
 class BoardForm(forms.ModelForm):
@@ -62,3 +62,13 @@ class BoardMemberForm(forms.Form):
         label='Nombre de usuario',
         widget=forms.TextInput(attrs={'placeholder': 'Buscar usuario...'}),
     )
+
+
+class BoardMessageForm(forms.ModelForm):
+    class Meta:
+        model = BoardMessage
+        fields = ['content']
+        labels = {'content': ''}
+        widgets = {
+            'content': forms.TextInput(attrs={'placeholder': 'Escribí un mensaje...', 'autocomplete': 'off'}),
+        }

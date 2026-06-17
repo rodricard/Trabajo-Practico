@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('boards/', include('boards.urls')),
-    path('', RedirectView.as_view(url='/boards/', permanent=False)),
+    path('groups/', include('groups.urls')),
+    path('', RedirectView.as_view(url='/groups/', permanent=False)),
 ]

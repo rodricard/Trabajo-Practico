@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}{{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'group_list' %}" class="breadcrumb">&#8592; Grupos</a>
+        <h1>{{ group.name }}</h1>
+        {% if group.description %}<p class="text-muted">{{ group.description }}</p>{% endif %}
+    </div>
+</div>
+
+<div class="group-layout-simple">
+
+    {% if is_admin and pending %}
+    <div class="side-section">
+        <h3 class="side-section-title">&#9888; Solicitudes pendientes ({{ pending|length }})</h3>
+        {% for req in pending %}
+        <div class="member-item">
+            <div class="member-info">
+                <span class="member-avatar">{{ req.user.username|first|upper }}</span>
+                <strong>{{ req.user.username }}</strong>
+            </div>
+            <div style="display:flex;gap:.4rem;">
+                <form method="post" action="{% url 'group_approve' group.pk req.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary btn-sm">&#10003; Aprobar</button>
+                </form>
+                <form method="post" action="{% url 'group_reject' group.pk req.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm">&#10005; Rechazar</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="side-section">
+        <h3 class="side-section-title">&#128101; Miembros ({{ members|length }})</h3>
+        {% for m in members %}
+        <div class="member-item">
+            <div class="member-info">
+                <span class="member-avatar {% if m.role == 'admin' %}member-avatar--admin{% endif %}">
+                    {{ m.user.username|first|upper }}
+                </span>
+                <div>
+                    <strong>{{ m.user.username }}</strong>
+                    <small>{{ m.get_role_display }}</small>
+                </div>
+            </div>
+            {% if is_admin and m.user != group.created_by %}
+            <div style="display:flex;gap:.4rem;align-items:center;">
+                <form method="post" action="{% url 'group_set_role' group.pk m.pk %}">
+                    {% csrf_token %}
+                    <select name="role" onchange="this.form.submit()" class="role-select">
+                        <option value="member" {% if m.role == 'member' %}selected{% endif %}>Miembro</option>
+                        <option value="admin" {% if m.role == 'admin' %}selected{% endif %}>Admin</option>
+                    </select>
+                </form>
+                <form method="post" action="{% url 'group_remove_member' group.pk m.pk %}"
+                      onsubmit="return confirm('¿Expulsar a {{ m.user.username }}?')">
+                    {% csrf_token %}
+                    <button class="btn-icon" style="opacity:1;" title="Expulsar">&#128683;</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}
