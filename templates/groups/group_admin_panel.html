@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Panel Admin — {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'group_detail' group.pk %}" class="breadcrumb">&#8592; {{ group.name }}</a>
+        <h1>&#9881; Panel de administrador</h1>
+    </div>
+</div>
+
+{% if pending %}
+<h2 class="section-title">&#9888; Solicitudes pendientes ({{ pending|length }})</h2>
+<div class="admin-table-wrap">
+    <table class="admin-table">
+        <thead><tr><th>Usuario</th><th>Acciones</th></tr></thead>
+        <tbody>
+        {% for req in pending %}
+        <tr>
+            <td><strong>{{ req.user.username }}</strong></td>
+            <td style="display:flex;gap:.5rem;">
+                <form method="post" action="{% url 'group_approve' group.pk req.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary btn-sm">&#10003; Aprobar</button>
+                </form>
+                <form method="post" action="{% url 'group_reject' group.pk req.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-danger btn-sm">&#10005; Rechazar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<h2 class="section-title">&#128202; Estadísticas por miembro</h2>
+<div class="admin-table-wrap">
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Miembro</th>
+                <th>Rol</th>
+                <th>Total</th>
+                <th>Pendiente</th>
+                <th>En proceso</th>
+                <th>Completado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for s in stats %}
+        <tr>
+            <td><strong>{{ s.member.user.username }}</strong></td>
+            <td><span class="badge">{{ s.member.get_role_display }}</span></td>
+            <td>{{ s.total }}</td>
+            <td><span class="badge">{{ s.pendiente }}</span></td>
+            <td><span class="badge" style="background:#fff3cd;color:#856404;">{{ s.en_proceso }}</span></td>
+            <td><span class="badge" style="background:#d1e7dd;color:#0a3622;">{{ s.completado }}</span></td>
+            <td>
+                {% if s.member.user != group.created_by %}
+                <div style="display:flex;gap:.4rem;">
+                    <form method="post" action="{% url 'group_set_role' group.pk s.member.pk %}">
+                        {% csrf_token %}
+                        <select name="role" onchange="this.form.submit()" class="role-select">
+                            <option value="member" {% if s.member.role == 'member' %}selected{% endif %}>Miembro</option>
+                            <option value="admin" {% if s.member.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                    </form>
+                    <form method="post" action="{% url 'group_remove_member' group.pk s.member.pk %}"
+                          onsubmit="return confirm('¿Expulsar a {{ s.member.user.username }}?')">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm">Expulsar</button>
+                    </form>
+                </div>
+                {% else %}
+                <span class="badge">Fundador</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
