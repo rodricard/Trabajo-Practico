@@ -23,5 +23,6 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('boards/', include('boards.urls')),
     path('groups/', include('groups.urls')),
+    path('api/', include('boards.api_urls')),
     path('', RedirectView.as_view(url='/groups/', permanent=False)),
 ]
