@@ -21,4 +21,5 @@ urlpatterns = [
     path('cards/<int:card_pk>/comentarios/agregar/', views.comment_add, name='comment_add'),
     path('cards/<int:card_pk>/labels/toggle/', views.label_toggle, name='label_toggle'),
     path('comentarios/<int:pk>/eliminar/', views.comment_delete, name='comment_delete'),
+    path('buscar/', views.search, name='search'),
 ]

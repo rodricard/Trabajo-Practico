@@ -374,3 +374,19 @@ def card_delete(request, pk):
     if request.method == 'POST':
         card.delete()
     return redirect('board_detail', pk=board.pk)
+
+
+@login_required
+def search(request):
+    query = request.GET.get('q', '').strip()
+    results = []
+    if query:
+        user_boards = Board.objects.filter(board_members__user=request.user)
+        results = Card.objects.filter(
+            list__board__in=user_boards,
+            title__icontains=query,
+        ).select_related('list__board', 'assigned_to').order_by('list__board__title', 'title')
+    return render(request, 'boards/search_results.html', {
+        'query':   query,
+        'results': results,
+    })
