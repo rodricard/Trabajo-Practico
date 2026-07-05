@@ -17,4 +17,8 @@ urlpatterns = [
     path('cards/<int:pk>/delete/', views.card_delete, name='card_delete'),
     path('<int:pk>/chat/enviar/', views.board_message_send, name='board_message_send'),
     path('<int:pk>/chat/bloquear/', views.board_toggle_chat_lock, name='board_toggle_chat_lock'),
+    path('<int:board_pk>/labels/crear/', views.label_create, name='label_create'),
+    path('cards/<int:card_pk>/comentarios/agregar/', views.comment_add, name='comment_add'),
+    path('cards/<int:card_pk>/labels/toggle/', views.label_toggle, name='label_toggle'),
+    path('comentarios/<int:pk>/eliminar/', views.comment_delete, name='comment_delete'),
 ]

@@ -10,5 +10,6 @@ urlpatterns = [
     path('<int:pk>/miembros/<int:member_pk>/rechazar/', views.group_reject, name='group_reject'),
     path('<int:pk>/miembros/<int:member_pk>/expulsar/', views.group_remove_member, name='group_remove_member'),
     path('<int:pk>/miembros/<int:member_pk>/rol/', views.group_set_role, name='group_set_role'),
+    path('<int:pk>/admin/', views.group_admin_panel, name='group_admin_panel'),
     path('notificaciones/', views.notifications_list, name='notifications_list'),
 ]

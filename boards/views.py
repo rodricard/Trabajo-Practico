@@ -6,8 +6,9 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Board, BoardMember, List, Card, BoardMessage
-from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm, BoardMessageForm
+from .models import Board, BoardMember, List, Card, BoardMessage, Comment, Label
+from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm, BoardMessageForm, CommentForm, LabelForm
+from groups.models import Notification
 
 
 def _is_member(user, board):
@@ -90,6 +91,7 @@ def board_detail(request, pk):
         'chat_messages':  chat_messages,
         'message_form':   BoardMessageForm() if can_write else None,
         'can_write':      can_write,
+        'today':          timezone.localdate(),
     })
 
 
@@ -273,22 +275,94 @@ def card_detail(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     board_users = User.objects.filter(board_memberships__board=board)
+    board_lists = board.lists.all()
+    board_labels = board.labels.all()
     if request.method == 'POST':
+        prev_assigned = card.assigned_to
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
         if form.is_valid():
-            form.save()
+            updated = form.save()
+            new_assigned = updated.assigned_to
+            if new_assigned and new_assigned != prev_assigned and new_assigned != request.user:
+                Notification.objects.create(
+                    user=new_assigned,
+                    title=f'{request.user.username} te asignó la tarjeta "{card.title}"',
+                    link=f'/boards/cards/{card.pk}/',
+                )
             messages.success(request, 'Tarjeta actualizada.')
             return redirect('card_detail', pk=card.pk)
     else:
         form = CardForm(instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
     return render(request, 'boards/card_detail.html', {
-        'card':     card,
-        'board':    board,
-        'form':     form,
-        'is_owner': _is_owner(request.user, board),
+        'card':         card,
+        'board':        board,
+        'form':         form,
+        'is_owner':     _is_owner(request.user, board),
+        'is_board_admin': _is_board_admin(request.user, board),
+        'comment_form': CommentForm(),
+        'comments':     card.comments.select_related('author').all(),
+        'board_labels': board_labels,
     })
+
+
+@login_required
+@require_POST
+def comment_add(request, card_pk):
+    card = get_object_or_404(Card, pk=card_pk)
+    if not _is_member(request.user, card.list.board):
+        return HttpResponseForbidden()
+    form = CommentForm(request.POST)
+    if form.is_valid():
+        c = form.save(commit=False)
+        c.card = card
+        c.author = request.user
+        c.save()
+    return redirect('card_detail', pk=card_pk)
+
+
+@login_required
+@require_POST
+def comment_delete(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    card = comment.card
+    if comment.author != request.user and not _is_board_admin(request.user, card.list.board):
+        return HttpResponseForbidden()
+    comment.delete()
+    return redirect('card_detail', pk=card.pk)
+
+
+@login_required
+@require_POST
+def label_toggle(request, card_pk):
+    card = get_object_or_404(Card, pk=card_pk)
+    if not _is_member(request.user, card.list.board):
+        return HttpResponseForbidden()
+    label_id = request.POST.get('label_id')
+    label = get_object_or_404(Label, pk=label_id, board=card.list.board)
+    if label in card.labels.all():
+        card.labels.remove(label)
+    else:
+        card.labels.add(label)
+    return redirect('card_detail', pk=card_pk)
+
+
+@login_required
+def label_create(request, board_pk):
+    board = get_object_or_404(Board, pk=board_pk)
+    if not _is_board_admin(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        form = LabelForm(request.POST)
+        if form.is_valid():
+            label = form.save(commit=False)
+            label.board = board
+            label.save()
+            messages.success(request, 'Etiqueta creada.')
+    return redirect('board_detail', pk=board_pk)
 
 
 @login_required
