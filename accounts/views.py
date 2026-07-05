@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.http import HttpResponseForbidden, JsonResponse
@@ -34,6 +35,7 @@ def register(request):
 
 @login_required
 def profile(request):
+    from django.utils import timezone
     owned_count = request.user.owned_boards.count()
     member_count = request.user.board_memberships.count()
     assigned_cards = request.user.assigned_cards.select_related('list__board').order_by('due_date')
@@ -41,6 +43,39 @@ def profile(request):
         'owned_count':    owned_count,
         'member_count':   member_count,
         'assigned_cards': assigned_cards,
+        'today':          timezone.localdate(),
+    })
+
+
+@login_required
+def profile_edit(request):
+    email_saved = False
+    password_saved = False
+    password_form = PasswordChangeForm(request.user)
+
+    if request.method == 'POST':
+        if 'change_email' in request.POST:
+            new_email = request.POST.get('email', '').strip()
+            if new_email:
+                request.user.email = new_email
+                request.user.save()
+                messages.success(request, 'Correo actualizado.')
+                email_saved = True
+            else:
+                messages.error(request, 'Ingresá un correo válido.')
+
+        elif 'change_password' in request.POST:
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Contraseña actualizada.')
+                password_saved = True
+            else:
+                messages.error(request, 'Corregí los errores en el formulario.')
+
+    return render(request, 'accounts/profile_edit.html', {
+        'password_form': password_form,
     })
 
 

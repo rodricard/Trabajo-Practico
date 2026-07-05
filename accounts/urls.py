@@ -11,6 +11,7 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('register/', views.register, name='register'),
     path('profile/', views.profile, name='profile'),
+    path('profile/editar/', views.profile_edit, name='profile_edit'),
     # Superadmin
     path('superadmin/', views.superadmin_dashboard, name='superadmin_dashboard'),
     path('superadmin/boards/', views.superadmin_boards, name='superadmin_boards'),
