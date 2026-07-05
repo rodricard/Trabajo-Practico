@@ -15,6 +15,8 @@
         <hr>
         <p><strong>Tableros propios:</strong> {{ owned_count }}</p>
         <p><strong>Tableros como miembro:</strong> {{ member_count }}</p>
+        <hr>
+        <a href="{% url 'profile_edit' %}" class="btn btn-ghost btn-sm">&#9998; Editar perfil</a>
     </div>
 
     <div class="card">

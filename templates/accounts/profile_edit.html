@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Editar perfil — Tableo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'profile' %}" class="breadcrumb">&#8592; Mi perfil</a>
+        <h1>Editar perfil</h1>
+    </div>
+</div>
+
+<div class="profile-grid">
+
+    <!-- Cambiar correo -->
+    <div class="form-container">
+        <h2>&#9993; Cambiar correo</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="email">Nuevo correo</label>
+                <input type="email" name="email" id="email" value="{{ user.email }}" class="form-control" required>
+            </div>
+            <button type="submit" name="change_email" class="btn btn-primary">Guardar correo</button>
+        </form>
+    </div>
+
+    <!-- Cambiar contraseña -->
+    <div class="form-container">
+        <h2>&#128274; Cambiar contraseña</h2>
+        <form method="post">
+            {% csrf_token %}
+            {% for field in password_form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <ul class="field-errors">
+                    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" name="change_password" class="btn btn-primary">Cambiar contraseña</button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

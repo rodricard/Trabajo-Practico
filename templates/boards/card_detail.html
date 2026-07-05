@@ -7,7 +7,7 @@
         <a href="{% url 'board_detail' board.pk %}" class="breadcrumb">
             &#8592; {{ board.title }} / {{ card.list.title }}
         </a>
-        <h1>Editar tarjeta</h1>
+        <h1>{{ card.title }}</h1>
     </div>
     <form method="post" action="{% url 'card_delete' card.pk %}"
           onsubmit="return confirm('¿Eliminar esta tarjeta?')">
@@ -16,29 +16,97 @@
     </form>
 </div>
 
-<div class="form-container">
-    <form method="post">
-        {% csrf_token %}
-        {% for field in form %}
-        <div class="form-group">
-            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {% if field.errors %}
-            <ul class="field-errors">
-                {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
-            </ul>
+<div class="card-detail-layout">
+
+    <!-- Columna principal -->
+    <div class="card-detail-main">
+
+        <!-- Formulario de edición -->
+        <div class="form-container">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <ul class="field-errors">
+                        {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                    <a href="{% url 'board_detail' board.pk %}" class="btn btn-ghost">Cancelar</a>
+                </div>
+            </form>
+            <div class="card-info">
+                <p><small>Creada: {{ card.created_at|date:"d/m/Y H:i" }}</small></p>
+                <p><small>Actualizada: {{ card.updated_at|date:"d/m/Y H:i" }}</small></p>
+            </div>
+        </div>
+
+        <!-- Comentarios -->
+        <div class="form-container" style="margin-top:1rem;">
+            <h3 style="margin-bottom:.75rem;">&#128172; Comentarios ({{ comments|length }})</h3>
+
+            {% for comment in comments %}
+            <div class="comment-item">
+                <div class="comment-header">
+                    <span class="member-avatar" style="width:28px;height:28px;font-size:.75rem;">
+                        {{ comment.author.username|first|upper }}
+                    </span>
+                    <strong>{{ comment.author.username }}</strong>
+                    <span class="chat-time">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+                    {% if comment.author == request.user or is_board_admin %}
+                    <form method="post" action="{% url 'comment_delete' comment.pk %}" style="margin-left:auto;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-icon" style="opacity:1;" title="Eliminar">&times;</button>
+                    </form>
+                    {% endif %}
+                </div>
+                <p class="comment-text">{{ comment.content }}</p>
+            </div>
+            {% empty %}
+            <p class="list-empty">Sin comentarios aún.</p>
+            {% endfor %}
+
+            <form method="post" action="{% url 'comment_add' card.pk %}" style="margin-top:.75rem;">
+                {% csrf_token %}
+                {{ comment_form.content }}
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.4rem;">Comentar</button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Columna lateral: etiquetas -->
+    <div class="card-detail-sidebar">
+        <div class="form-container">
+            <h3 style="margin-bottom:.75rem;">&#127991; Etiquetas</h3>
+
+            {% for label in board_labels %}
+            <form method="post" action="{% url 'label_toggle' card.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="label_id" value="{{ label.pk }}">
+                <button type="submit" class="label-toggle-btn {% if label in card.labels.all %}label-toggle-btn--active{% endif %}"
+                        style="background:{{ label.hex_color }};">
+                    {% if label in card.labels.all %}&#10003;{% endif %}
+                    {{ label.name }}
+                    <small>({{ label.get_color_display }})</small>
+                </button>
+            </form>
+            {% empty %}
+            <p class="list-empty">Sin etiquetas en este tablero.</p>
+            {% endfor %}
+
+            {% if is_board_admin %}
+            <hr style="margin:.75rem 0; border-color:#dfe1e6;">
+            <a href="{% url 'label_create' board.pk %}" class="btn btn-ghost btn-sm btn-full">+ Nueva etiqueta</a>
             {% endif %}
         </div>
-        {% endfor %}
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Guardar cambios</button>
-            <a href="{% url 'board_detail' board.pk %}" class="btn btn-ghost">Cancelar</a>
-        </div>
-    </form>
-
-    <div class="card-info">
-        <p><small>Creada: {{ card.created_at|date:"d/m/Y H:i" }}</small></p>
-        <p><small>Actualizada: {{ card.updated_at|date:"d/m/Y H:i" }}</small></p>
     </div>
+
 </div>
 {% endblock %}

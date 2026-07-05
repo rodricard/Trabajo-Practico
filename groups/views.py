@@ -152,6 +152,31 @@ def group_set_role(request, pk, member_pk):
     return redirect('group_detail', pk=group.pk)
 
 
+@login_required
+def group_admin_panel(request, pk):
+    group = get_object_or_404(WorkGroup, pk=pk)
+    if not group.is_admin(request.user):
+        return HttpResponseForbidden()
+    from boards.models import Card
+    members = group.group_members.filter(status='approved').select_related('user')
+    pending = group.group_members.filter(status='pending').select_related('user')
+    stats = []
+    for m in members:
+        cards = Card.objects.filter(assigned_to=m.user)
+        stats.append({
+            'member': m,
+            'total':      cards.count(),
+            'pendiente':  cards.filter(status='pendiente').count(),
+            'en_proceso': cards.filter(status='en_proceso').count(),
+            'completado': cards.filter(status='completado').count(),
+        })
+    return render(request, 'groups/group_admin_panel.html', {
+        'group':   group,
+        'stats':   stats,
+        'pending': pending,
+    })
+
+
 # ── Notificaciones ────────────────────────────────────────────────────────────
 
 @login_required

@@ -8,6 +8,9 @@
         <h1>{{ group.name }}</h1>
         {% if group.description %}<p class="text-muted">{{ group.description }}</p>{% endif %}
     </div>
+    {% if is_admin %}
+    <a href="{% url 'group_admin_panel' group.pk %}" class="btn btn-primary">&#128202; Panel Admin</a>
+    {% endif %}
 </div>
 
 <div class="group-layout-simple">

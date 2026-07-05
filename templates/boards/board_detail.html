@@ -24,6 +24,23 @@
     </div>
 </div>
 
+<!-- Filtros -->
+<div class="board-filters">
+    <select id="filterStatus" class="filter-select">
+        <option value="">Todos los estados</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="en_proceso">En proceso</option>
+        <option value="completado">Completado</option>
+    </select>
+    <select id="filterAssigned" class="filter-select">
+        <option value="">Todos los miembros</option>
+        {% for m in board.board_members.all %}
+        <option value="{{ m.user.pk }}">{{ m.user.username }}</option>
+        {% endfor %}
+    </select>
+    <button onclick="clearFilters()" class="btn btn-ghost btn-sm">&#10005; Limpiar</button>
+</div>
+
 <div class="board-workspace">
 
     <!-- Kanban -->
@@ -40,13 +57,25 @@
                     </form>
                 </div>
 
-                <div class="cards-container">
+                <div class="cards-container" data-list-id="{{ lst.pk }}">
                     {% for card in lst.cards.all %}
-                    <a href="{% url 'card_detail' card.pk %}" class="card-item">
+                    <a href="{% url 'card_detail' card.pk %}" class="card-item"
+                       data-status="{{ card.status }}"
+                       data-assigned="{{ card.assigned_to.pk|default:'' }}">
+                        {% if card.labels.all %}
+                        <div class="card-labels">
+                            {% for label in card.labels.all %}
+                            <span class="card-label-dot" style="background:{{ label.hex_color }};" title="{{ label.name }}"></span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                         <span class="card-title">{{ card.title }}</span>
                         <div class="card-meta">
                             {% if card.due_date %}
-                            <span class="card-due">&#128197; {{ card.due_date|date:"d/m" }}</span>
+                            <span class="card-due {% if card.due_date < today %}card-due--vencida{% elif card.due_date == today %}card-due--hoy{% endif %}">
+                                &#128197; {{ card.due_date|date:"d/m" }}
+                                {% if card.due_date < today %}&#9888;{% elif card.due_date == today %}&#128308;{% endif %}
+                            </span>
                             {% endif %}
                             {% if card.assigned_to %}
                             <span class="card-avatar" title="{{ card.assigned_to.username }}">
@@ -128,5 +157,24 @@
 <script>
     const chatBox = document.getElementById('chatMessages');
     if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+    function applyFilters() {
+        const status   = document.getElementById('filterStatus').value;
+        const assigned = document.getElementById('filterAssigned').value;
+        document.querySelectorAll('.card-item').forEach(card => {
+            const matchStatus   = !status   || card.dataset.status   === status;
+            const matchAssigned = !assigned || card.dataset.assigned  === assigned;
+            card.style.display = (matchStatus && matchAssigned) ? '' : 'none';
+        });
+    }
+
+    function clearFilters() {
+        document.getElementById('filterStatus').value   = '';
+        document.getElementById('filterAssigned').value = '';
+        applyFilters();
+    }
+
+    document.getElementById('filterStatus').addEventListener('change', applyFilters);
+    document.getElementById('filterAssigned').addEventListener('change', applyFilters);
 </script>
 {% endblock %}
