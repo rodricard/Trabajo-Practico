@@ -22,6 +22,12 @@ def _is_board_admin(user, board):
     return board.board_members.filter(user=user, role__in=['owner', 'admin']).exists()
 
 
+def _reindex(queryset):
+    for index, obj in enumerate(queryset):
+        if obj.position != index:
+            type(obj).objects.filter(pk=obj.pk).update(position=index)
+
+
 @login_required
 def board_list(request):
     owned = Board.objects.filter(owner=request.user)
@@ -211,6 +217,26 @@ def list_delete(request, pk):
 
 
 @login_required
+@require_POST
+def list_reorder(request, pk):
+    lst = get_object_or_404(List, pk=pk)
+    board = lst.board
+    if not _is_member(request.user, board):
+        return JsonResponse({'error': 'No tienes acceso a este tablero.'}, status=403)
+    try:
+        new_position = int(request.POST.get('position', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Posición inválida.'}, status=400)
+
+    lists = list(board.lists.exclude(pk=lst.pk).order_by('position'))
+    new_position = max(0, min(new_position, len(lists)))
+    lists.insert(new_position, lst)
+    _reindex(lists)
+
+    return JsonResponse({'ok': True, 'list_id': lst.pk, 'position': new_position})
+
+
+@login_required
 def card_create(request, list_pk):
     lst = get_object_or_404(List, pk=list_pk)
     if not _is_member(request.user, lst.board):
@@ -223,6 +249,35 @@ def card_create(request, list_pk):
             card.position = lst.cards.count()
             card.save()
     return redirect('board_detail', pk=lst.board.pk)
+
+
+@login_required
+@require_POST
+def card_move(request, pk):
+    card = get_object_or_404(Card, pk=pk)
+    board = card.list.board
+    if not _is_member(request.user, board):
+        return JsonResponse({'error': 'No tienes acceso a este tablero.'}, status=403)
+
+    target_list = get_object_or_404(List, pk=request.POST.get('list_id'), board=board)
+    try:
+        new_position = int(request.POST.get('position', 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Posición inválida.'}, status=400)
+
+    source_list = card.list
+
+    target_cards = list(target_list.cards.exclude(pk=card.pk).order_by('position'))
+    new_position = max(0, min(new_position, len(target_cards)))
+    target_cards.insert(new_position, card)
+    _reindex(target_cards)
+
+    if source_list.pk != target_list.pk:
+        card.list = target_list
+        card.save(update_fields=['list'])
+        _reindex(source_list.cards.order_by('position'))
+
+    return JsonResponse({'ok': True, 'card_id': card.pk, 'list_id': target_list.pk, 'position': new_position})
 
 
 @login_required

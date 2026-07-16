@@ -12,7 +12,9 @@ urlpatterns = [
     path('<int:board_pk>/members/<int:member_pk>/set-role/', views.api_member_set_role, name='api_member_set_role'),
     path('<int:board_pk>/lists/create/', views.list_create, name='list_create'),
     path('lists/<int:pk>/delete/', views.list_delete, name='list_delete'),
+    path('lists/<int:pk>/reorder/', views.list_reorder, name='list_reorder'),
     path('lists/<int:list_pk>/cards/create/', views.card_create, name='card_create'),
     path('cards/<int:pk>/', views.card_detail, name='card_detail'),
+    path('cards/<int:pk>/mover/', views.card_move, name='card_move'),
     path('cards/<int:pk>/delete/', views.card_delete, name='card_delete'),
 ]
