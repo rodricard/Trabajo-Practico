@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ board.title }}{% endblock %}
 
 {% block content %}
@@ -92,6 +93,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/vendor/sortable.min.js' %}"></script>
 <script>
     const chatBox = document.getElementById('chatMessages');
     if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
@@ -114,5 +116,80 @@
 
     document.getElementById('filterStatus').addEventListener('change', applyFilters);
     document.getElementById('filterAssigned').addEventListener('change', applyFilters);
+
+    // ── Drag & drop (SortableJS) ──────────────────────────────────────────
+    const csrfToken = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+
+    function postForm(url, params) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(params).toString(),
+        });
+    }
+
+    document.querySelectorAll('.cards-container').forEach(function (container) {
+        new Sortable(container, {
+            group: 'cards',
+            animation: 150,
+            onEnd: function (evt) {
+                const cardId = evt.item.dataset.cardId;
+                const listId = evt.to.dataset.listId;
+                postForm(`/boards/cards/${cardId}/mover/`, { list_id: listId, position: evt.newIndex });
+            },
+        });
+    });
+
+    const kanbanBoardEl = document.querySelector('.kanban-board');
+    if (kanbanBoardEl) {
+        new Sortable(kanbanBoardEl, {
+            animation: 150,
+            draggable: '.kanban-list:not(.kanban-list--add)',
+            onEnd: function (evt) {
+                const container = evt.item.querySelector('.cards-container');
+                if (!container) return;
+                postForm(`/boards/lists/${container.dataset.listId}/reorder/`, { position: evt.newIndex });
+            },
+        });
+    }
+
+    // ── WebSocket: cambios del tablero en vivo ────────────────────────────
+    const boardId = {{ board.pk }};
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const boardSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/boards/${boardId}/`);
+
+    boardSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+
+        if (data.event === 'card_moved') {
+            const card = document.querySelector(`.card-item[data-card-id="${data.card_id}"]`);
+            const container = document.querySelector(`.cards-container[data-list-id="${data.list_id}"]`);
+            if (card && container) {
+                const emptyMsg = container.querySelector('.list-empty');
+                if (emptyMsg) emptyMsg.remove();
+                const siblings = Array.from(container.querySelectorAll(':scope > .card-item')).filter(el => el !== card);
+                container.insertBefore(card, siblings[data.position] || null);
+            }
+            return;
+        }
+
+        if (data.event === 'list_reordered') {
+            const container = document.querySelector(`.cards-container[data-list-id="${data.list_id}"]`);
+            const listEl = container ? container.closest('.kanban-list') : null;
+            const board = document.querySelector('.kanban-board');
+            if (listEl && board) {
+                const others = Array.from(board.querySelectorAll('.kanban-list:not(.kanban-list--add)')).filter(el => el !== listEl);
+                board.insertBefore(listEl, others[data.position] || board.querySelector('.kanban-list--add'));
+            }
+            return;
+        }
+
+        if (['card_created', 'card_deleted', 'card_updated', 'list_created', 'list_deleted'].includes(data.event)) {
+            location.reload();
+        }
+    };
 </script>
 {% endblock %}

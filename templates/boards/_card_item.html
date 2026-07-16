@@ -1,4 +1,5 @@
 <a href="{% url 'card_detail' card.pk %}" class="card-item"
+   data-card-id="{{ card.pk }}"
    data-status="{{ card.status }}"
    data-assigned="{{ card.assigned_to.pk|default:'' }}">
     {% if card.labels.all %}
