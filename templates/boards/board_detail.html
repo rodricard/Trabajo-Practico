@@ -148,6 +148,8 @@
         new Sortable(kanbanBoardEl, {
             animation: 150,
             draggable: '.kanban-list:not(.kanban-list--add)',
+            handle: '.list-title',
+            preventOnFilter: false,
             onEnd: function (evt) {
                 const container = evt.item.querySelector('.cards-container');
                 if (!container) return;

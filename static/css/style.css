@@ -526,7 +526,7 @@ a { color: inherit; text-decoration: none; }
 .card-item:hover { box-shadow: 0 4px 8px rgba(9,30,66,.2); transform: translateY(-1px); }
 
 /* Drag & drop */
-.kanban-list { cursor: grab; }
+.list-title { cursor: grab; }
 .cards-container { min-height: 8px; }
 .card-item { cursor: grab; }
 .sortable-ghost { opacity: .4; }
