@@ -1,0 +1,13 @@
+<div class="chat-msg {% if msg.is_system %}chat-msg--system{% endif %}">
+    {% if msg.is_system %}
+    <span class="chat-system-text">&#9432; {{ msg.content }}</span>
+    <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
+    {% else %}
+    <div class="chat-msg-header">
+        <span class="chat-avatar">{{ msg.user.username|first|upper }}</span>
+        <strong>{{ msg.user.username }}</strong>
+        <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
+    </div>
+    <p class="chat-text">{{ msg.content }}</p>
+    {% endif %}
+</div>
