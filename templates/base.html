@@ -70,7 +70,7 @@
         <span class="sidebar-icon">&#128203;</span>
         <span class="sidebar-label">Tableros</span>
     </a>
-    <a href="{% url 'notifications_list' %}" class="sidebar-item">
+    <a href="{% url 'notifications_list' %}" class="sidebar-item" id="notifSidebarItem">
         <span class="sidebar-icon">&#128276;</span>
         <span class="sidebar-label">
             Notificaciones
@@ -104,6 +104,10 @@
         {% block content %}{% endblock %}
     </main>
 </div>
+
+{% if user.is_authenticated %}
+<div class="ws-toast-container" id="wsToastContainer"></div>
+{% endif %}
 
 <script>
     const toggle = document.getElementById('dropdownToggle');
@@ -146,12 +150,29 @@
         if (!badge) return;
         const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const notifSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/notifications/`);
+        const sidebarItem = document.getElementById('notifSidebarItem');
+        const toastContainer = document.getElementById('wsToastContainer');
+
         notifSocket.onmessage = function (e) {
             const data = JSON.parse(e.data);
             if (data.event === 'notification') {
                 const next = (parseInt(badge.textContent, 10) || 0) + 1;
                 badge.textContent = next;
                 badge.style.display = '';
+
+                if (sidebarItem) {
+                    sidebarItem.classList.add('sidebar-item--pulse');
+                    setTimeout(function () { sidebarItem.classList.remove('sidebar-item--pulse'); }, 800);
+                }
+
+                if (toastContainer) {
+                    const toast = document.createElement('a');
+                    toast.className = 'ws-toast';
+                    toast.href = data.link || '#';
+                    toast.textContent = data.title;
+                    toastContainer.appendChild(toast);
+                    setTimeout(function () { toast.remove(); }, 5000);
+                }
             }
         };
     })();
