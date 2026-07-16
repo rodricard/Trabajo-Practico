@@ -4,7 +4,7 @@ from channels.layers import get_channel_layer
 from .models import Notification
 
 
-def broadcast_notification(user_id, payload):
+def broadcast_user_event(user_id, event_type, **payload):
     channel_layer = get_channel_layer()
     if channel_layer is None:
         return
@@ -13,17 +13,18 @@ def broadcast_notification(user_id, payload):
         f'user_{user_id}',
         {
             'type': 'user_event',
-            'payload': {'event': 'notification', **payload},
+            'payload': {'event': event_type, **payload},
         },
     )
 
 
 def notify_user(user, title, link=''):
     notification = Notification.objects.create(user=user, title=title, link=link)
-    broadcast_notification(user.id, {
-        'id': notification.id,
-        'title': notification.title,
-        'link': notification.link,
-        'created_at': notification.created_at.isoformat(),
-    })
+    broadcast_user_event(
+        user.id, 'notification',
+        id=notification.id,
+        title=notification.title,
+        link=notification.link,
+        created_at=notification.created_at.isoformat(),
+    )
     return notification
