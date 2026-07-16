@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from .models import Board, BoardMember, List, Card
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
 from .realtime import broadcast_board_event
+from groups.utils import notify_user
 
 
 def _is_member(user, board):
@@ -143,6 +144,7 @@ def board_members(request, pk):
                     messages.warning(request, f'"{username}" ya es miembro.')
                 else:
                     BoardMember.objects.create(board=board, user=user, role='member')
+                    notify_user(user, f'{request.user.username} te agregó al tablero "{board.title}"', f'/boards/{board.pk}/')
                     messages.success(request, f'"{username}" agregado al tablero.')
             except User.DoesNotExist:
                 messages.error(request, f'Usuario "{username}" no encontrado.')
@@ -296,11 +298,15 @@ def card_detail(request, pk):
         return HttpResponseForbidden()
     board_users = User.objects.filter(board_memberships__board=board)
     if request.method == 'POST':
+        prev_assigned = card.assigned_to
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
         if form.is_valid():
             updated = form.save()
             broadcast_board_event(board.pk, 'card_updated', card_id=updated.pk, list_id=updated.list_id)
+            new_assigned = updated.assigned_to
+            if new_assigned and new_assigned != prev_assigned and new_assigned != request.user:
+                notify_user(new_assigned, f'{request.user.username} te asignó la tarjeta "{card.title}"', f'/boards/cards/{card.pk}/')
             messages.success(request, 'Tarjeta actualizada.')
             return redirect('card_detail', pk=card.pk)
     else:
