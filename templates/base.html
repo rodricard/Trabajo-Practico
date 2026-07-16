@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Trello Clone{% endblock %}</title>
+    <title>{% block title %}Tableo{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
@@ -14,7 +14,13 @@
         {% if user.is_authenticated %}
         <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
         {% endif %}
-        <a href="{% url 'board_list' %}" class="topbar-brand">&#9632; Trello Clone</a>
+        <a href="{% url 'board_list' %}" class="topbar-brand">&#9670; Tableo</a>
+        {% if user.is_authenticated %}
+        <form method="get" action="{% url 'search' %}" class="topbar-search">
+            <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar tarjetas..." class="search-input" autocomplete="off">
+        </form>
+        {% endif %}
+        <button class="dark-mode-toggle" id="darkModeToggle" title="Modo oscuro">&#9790;</button>
     </div>
 
     {% if user.is_authenticated %}
@@ -56,17 +62,24 @@
 
 {% if user.is_authenticated %}
 <aside class="sidebar" id="sidebar">
+    <a href="{% url 'group_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128101;</span>
+        <span class="sidebar-label">Grupos</span>
+    </a>
     <a href="{% url 'board_list' %}" class="sidebar-item">
-        <span class="sidebar-icon">&#127968;</span>
-        <span class="sidebar-label">Inicio</span>
+        <span class="sidebar-icon">&#128203;</span>
+        <span class="sidebar-label">Tableros</span>
+    </a>
+    <a href="{% url 'notifications_list' %}" class="sidebar-item">
+        <span class="sidebar-icon">&#128276;</span>
+        <span class="sidebar-label">
+            Notificaciones
+            <span class="notif-badge" id="notifBadge" {% if not unread_notifications %}style="display:none;"{% endif %}>{{ unread_notifications }}</span>
+        </span>
     </a>
     <a href="{% url 'profile' %}" class="sidebar-item">
         <span class="sidebar-icon">&#128100;</span>
         <span class="sidebar-label">Perfil</span>
-    </a>
-    <a href="{% url 'board_list' %}" class="sidebar-item">
-        <span class="sidebar-icon">&#128203;</span>
-        <span class="sidebar-label">Tareas</span>
     </a>
     {% if user.profile.is_superadmin %}
     <a href="{% url 'superadmin_dashboard' %}" class="sidebar-item sidebar-item--admin">
@@ -118,6 +131,32 @@
         });
     }
 </script>
+<script>
+    const darkBtn = document.getElementById('darkModeToggle');
+    if (localStorage.getItem('darkMode') === '1') document.body.classList.add('dark-mode');
+    if (darkBtn) darkBtn.addEventListener('click', function() {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? '1' : '0');
+    });
+</script>
+{% if user.is_authenticated %}
+<script>
+    (function () {
+        const badge = document.getElementById('notifBadge');
+        if (!badge) return;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const notifSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/notifications/`);
+        notifSocket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            if (data.event === 'notification') {
+                const next = (parseInt(badge.textContent, 10) || 0) + 1;
+                badge.textContent = next;
+                badge.style.display = '';
+            }
+        };
+    })();
+</script>
+{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>
