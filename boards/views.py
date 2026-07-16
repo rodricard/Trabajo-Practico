@@ -8,6 +8,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Board, BoardMember, List, Card
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
+from .realtime import broadcast_board_event
 
 
 def _is_member(user, board):
@@ -202,6 +203,7 @@ def list_create(request, board_pk):
             lst.board = board
             lst.position = board.lists.count()
             lst.save()
+            broadcast_board_event(board.pk, 'list_created', list_id=lst.pk, title=lst.title, position=lst.position)
     return redirect('board_detail', pk=board_pk)
 
 
@@ -212,7 +214,9 @@ def list_delete(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
+        list_id = lst.pk
         lst.delete()
+        broadcast_board_event(board.pk, 'list_deleted', list_id=list_id)
     return redirect('board_detail', pk=board.pk)
 
 
@@ -232,6 +236,7 @@ def list_reorder(request, pk):
     new_position = max(0, min(new_position, len(lists)))
     lists.insert(new_position, lst)
     _reindex(lists)
+    broadcast_board_event(board.pk, 'list_reordered', list_id=lst.pk, position=new_position)
 
     return JsonResponse({'ok': True, 'list_id': lst.pk, 'position': new_position})
 
@@ -248,6 +253,7 @@ def card_create(request, list_pk):
             card.list = lst
             card.position = lst.cards.count()
             card.save()
+            broadcast_board_event(lst.board.pk, 'card_created', card_id=card.pk, list_id=lst.pk, title=card.title, position=card.position)
     return redirect('board_detail', pk=lst.board.pk)
 
 
@@ -277,6 +283,8 @@ def card_move(request, pk):
         card.save(update_fields=['list'])
         _reindex(source_list.cards.order_by('position'))
 
+    broadcast_board_event(board.pk, 'card_moved', card_id=card.pk, list_id=target_list.pk, position=new_position)
+
     return JsonResponse({'ok': True, 'card_id': card.pk, 'list_id': target_list.pk, 'position': new_position})
 
 
@@ -291,7 +299,8 @@ def card_detail(request, pk):
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
         if form.is_valid():
-            form.save()
+            updated = form.save()
+            broadcast_board_event(board.pk, 'card_updated', card_id=updated.pk, list_id=updated.list_id)
             messages.success(request, 'Tarjeta actualizada.')
             return redirect('card_detail', pk=card.pk)
     else:
@@ -312,5 +321,7 @@ def card_delete(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
+        card_id = card.pk
         card.delete()
+        broadcast_board_event(board.pk, 'card_deleted', card_id=card_id)
     return redirect('board_detail', pk=board.pk)
