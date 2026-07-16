@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from .models import Board, BoardMember, List, Card
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
 from .realtime import broadcast_board_event
-from groups.utils import notify_user
+from groups.utils import notify_user, broadcast_user_event
 
 
 def _is_member(user, board):
@@ -145,6 +145,11 @@ def board_members(request, pk):
                 else:
                     BoardMember.objects.create(board=board, user=user, role='member')
                     notify_user(user, f'{request.user.username} te agregó al tablero "{board.title}"', f'/boards/{board.pk}/')
+                    broadcast_user_event(
+                        user.id, 'board_added',
+                        board_id=board.pk, title=board.title,
+                        color=board.background_color, owner=board.owner.username,
+                    )
                     messages.success(request, f'"{username}" agregado al tablero.')
             except User.DoesNotExist:
                 messages.error(request, f'Usuario "{username}" no encontrado.')
