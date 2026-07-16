@@ -762,3 +762,26 @@ a { color: inherit; text-decoration: none; }
     from { opacity: 0; transform: translateY(-8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+
+.autocomplete-suggestions {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #dfe1e6;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(9,30,66,.15);
+    z-index: 50;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: .2rem;
+}
+.autocomplete-suggestion {
+    padding: .5rem .75rem;
+    font-size: .875rem;
+    color: #172b4d;
+    cursor: pointer;
+}
+.autocomplete-suggestion:hover { background: #f4f5f7; }

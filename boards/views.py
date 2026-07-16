@@ -165,6 +165,24 @@ def board_members(request, pk):
 
 
 @login_required
+def board_member_search(request, board_pk):
+    board = get_object_or_404(Board, pk=board_pk)
+    if not _is_board_admin(request.user, board):
+        return JsonResponse({'error': 'No autorizado.'}, status=403)
+
+    query = request.GET.get('q', '').strip()
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    existing_ids = board.board_members.values_list('user_id', flat=True)
+    users = User.objects.filter(username__icontains=query) \
+        .exclude(pk__in=existing_ids).exclude(pk=board.owner_id) \
+        .order_by('username')[:8]
+
+    return JsonResponse({'results': [u.username for u in users]})
+
+
+@login_required
 def board_member_remove(request, board_pk, member_pk):
     board = get_object_or_404(Board, pk=board_pk)
     if not _is_board_admin(request.user, board):

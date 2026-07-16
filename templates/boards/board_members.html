@@ -15,9 +15,12 @@
         <form method="post">
             {% csrf_token %}
             {% for field in form %}
-            <div class="form-group">
+            <div class="form-group" {% if field.name == 'username' %}style="position: relative;"{% endif %}>
                 <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
+                {% if field.name == 'username' %}
+                <div class="autocomplete-suggestions" id="usernameSuggestions"></div>
+                {% endif %}
                 {% if field.errors %}
                 <ul class="field-errors">
                     {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
@@ -71,6 +74,44 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+(function () {
+    const input = document.getElementById('id_username');
+    const box = document.getElementById('usernameSuggestions');
+    if (!input || !box) return;
+    let timer = null;
+
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (q.length < 2) { box.innerHTML = ''; box.style.display = 'none'; return; }
+        timer = setTimeout(function () {
+            fetch(`{% url 'board_member_search' board.pk %}?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(function (data) {
+                    box.innerHTML = '';
+                    if (!data.results || !data.results.length) { box.style.display = 'none'; return; }
+                    data.results.forEach(function (username) {
+                        const item = document.createElement('div');
+                        item.className = 'autocomplete-suggestion';
+                        item.textContent = username;
+                        item.addEventListener('click', function () {
+                            input.value = username;
+                            box.innerHTML = '';
+                            box.style.display = 'none';
+                        });
+                        box.appendChild(item);
+                    });
+                    box.style.display = 'block';
+                });
+        }, 200);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (e.target !== input) { box.style.display = 'none'; }
+    });
+})();
+</script>
 {% if is_owner %}
 <script>
 const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
