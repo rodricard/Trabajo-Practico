@@ -19,6 +19,19 @@ class Board(models.Model):
         return self.title
 
 
+class Activity(models.Model):
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    text = models.CharField(max_length=300)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'[{self.board.title}] {self.text}'
+
+
 class BoardMessage(models.Model):
     board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='chat_messages')
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='board_messages')
@@ -55,6 +68,7 @@ class List(models.Model):
     title = models.CharField(max_length=200)
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='lists')
     position = models.PositiveIntegerField(default=0)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -104,6 +118,7 @@ class Card(models.Model):
     )
     labels = models.ManyToManyField(Label, blank=True, related_name='cards')
     due_date = models.DateField(null=True, blank=True)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -125,3 +140,17 @@ class Comment(models.Model):
 
     def __str__(self):
         return f'{self.author.username} en {self.card.title}'
+
+
+class ChecklistItem(models.Model):
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='checklist_items')
+    text = models.CharField(max_length=200)
+    is_done = models.BooleanField(default=False)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['position']
+
+    def __str__(self):
+        return f'{self.text} ({self.card.title})'

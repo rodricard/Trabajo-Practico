@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Archivados - {{ board.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'board_detail' board.pk %}" class="breadcrumb">&#8592; {{ board.title }}</a>
+        <h1>Archivados</h1>
+    </div>
+</div>
+
+<div class="members-layout">
+    <div class="card">
+        <h2>Listas archivadas</h2>
+        {% if archived_lists %}
+        <ul class="card-list">
+            {% for lst in archived_lists %}
+            <li class="archived-item">
+                <span>{{ lst.title }}</span>
+                <div class="archived-actions">
+                    <form method="post" action="{% url 'list_unarchive' lst.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost btn-sm">Restaurar</button>
+                    </form>
+                    <form method="post" action="{% url 'list_delete_permanent' lst.pk %}"
+                          onsubmit="return confirm('&#191;Eliminar esta lista para siempre? Esta acci&oacute;n no se puede deshacer.')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Eliminar definitivamente</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">No hay listas archivadas.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Tarjetas archivadas</h2>
+        {% if archived_cards %}
+        <ul class="card-list">
+            {% for card in archived_cards %}
+            <li class="archived-item">
+                <span>{{ card.title }} <small>({{ card.list.title }})</small></span>
+                <div class="archived-actions">
+                    <form method="post" action="{% url 'card_unarchive' card.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost btn-sm">Restaurar</button>
+                    </form>
+                    <form method="post" action="{% url 'card_delete_permanent' card.pk %}"
+                          onsubmit="return confirm('&#191;Eliminar esta tarjeta para siempre? Esta acci&oacute;n no se puede deshacer.')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Eliminar definitivamente</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">No hay tarjetas archivadas.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

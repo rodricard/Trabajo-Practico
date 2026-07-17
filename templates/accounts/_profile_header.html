@@ -1,0 +1,13 @@
+<div class="profile-header">
+    {% if user.profile.avatar %}
+    <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}" class="profile-avatar-large profile-avatar-large--img">
+    {% else %}
+    <span class="profile-avatar-large">{{ user.username|first|upper }}</span>
+    {% endif %}
+    <div class="profile-header-info">
+        <h1>{{ user.username }}</h1>
+        <p class="profile-header-email">{{ user.email }}</p>
+        <p class="profile-header-meta">Miembro desde {{ user.date_joined|date:"d/m/Y" }}</p>
+    </div>
+    <a href="{% url 'profile_edit' %}" class="btn btn-ghost btn-sm">&#9998; Editar perfil</a>
+</div>

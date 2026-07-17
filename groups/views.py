@@ -5,16 +5,9 @@ from django.contrib import messages
 from django.http import HttpResponseForbidden
 from django.views.decorators.http import require_POST
 
-from .models import WorkGroup, GroupMember, Notification
+from .models import WorkGroup, GroupMember
 from .forms import WorkGroupForm
-
-
-def _log(group, text):
-    pass
-
-
-def _notify(user, title, link=''):
-    Notification.objects.create(user=user, title=title, link=link)
+from .utils import notify_user
 
 
 # ── Grupos ────────────────────────────────────────────────────────────────────
@@ -48,7 +41,6 @@ def group_create(request):
             group.created_by = request.user
             group.save()
             GroupMember.objects.create(group=group, user=request.user, role='admin', status='approved')
-            _log(group, f'{request.user.username} creó el grupo.')
             messages.success(request, f'Grupo "{group.name}" creado.')
             return redirect('group_detail', pk=group.pk)
     else:
@@ -81,8 +73,8 @@ def group_join(request, pk):
         return redirect('group_list')
     GroupMember.objects.create(group=group, user=request.user, role='member', status='pending')
     for admin in group.group_members.filter(role='admin', status='approved').select_related('user'):
-        _notify(admin.user, f'{request.user.username} quiere unirse a "{group.name}".',
-                f'/groups/{group.pk}/')
+        notify_user(admin.user, f'{request.user.username} quiere unirse a "{group.name}".',
+                    f'/groups/{group.pk}/')
     messages.success(request, 'Solicitud enviada. Esperá que un admin la apruebe.')
     return redirect('group_list')
 
@@ -96,8 +88,7 @@ def group_approve(request, pk, member_pk):
     member = get_object_or_404(GroupMember, pk=member_pk, group=group, status='pending')
     member.status = 'approved'
     member.save()
-    _log(group, f'{member.user.username} se unió al grupo.')
-    _notify(member.user, f'Tu solicitud para unirte a "{group.name}" fue aprobada.', f'/groups/{group.pk}/')
+    notify_user(member.user, f'Tu solicitud para unirte a "{group.name}" fue aprobada.', f'/groups/{group.pk}/')
     messages.success(request, f'{member.user.username} aprobado.')
     return redirect('group_detail', pk=group.pk)
 
@@ -127,7 +118,6 @@ def group_remove_member(request, pk, member_pk):
         return redirect('group_detail', pk=group.pk)
     username = member.user.username
     member.delete()
-    _log(group, f'{username} fue removido del grupo.')
     messages.success(request, f'{username} removido del grupo.')
     return redirect('group_detail', pk=group.pk)
 
@@ -147,8 +137,7 @@ def group_set_role(request, pk, member_pk):
         member.role = new_role
         member.save()
         label = 'Administrador' if new_role == 'admin' else 'Miembro'
-        _log(group, f'{member.user.username} ahora es {label}.')
-        _notify(member.user, f'Tu rol en "{group.name}" cambió a {label}.', f'/groups/{group.pk}/')
+        notify_user(member.user, f'Tu rol en "{group.name}" cambió a {label}.', f'/groups/{group.pk}/')
     return redirect('group_detail', pk=group.pk)
 
 

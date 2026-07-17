@@ -8,6 +8,7 @@ from rest_framework.authtoken.models import Token
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     is_superadmin = models.BooleanField(default=False)
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     def __str__(self):
         return f'Profile: {self.user.username}'

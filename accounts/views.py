@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -18,6 +19,15 @@ def _is_superadmin(user):
         return False
 
 
+def _delete_avatar_file(profile):
+    if not profile.avatar:
+        return
+    try:
+        profile.avatar.delete(save=False)
+    except OSError:
+        pass
+
+
 def register(request):
     if request.user.is_authenticated:
         return redirect('board_list')
@@ -36,14 +46,19 @@ def register(request):
 @login_required
 def profile(request):
     from django.utils import timezone
+    today = timezone.localdate()
     owned_count = request.user.owned_boards.count()
     member_count = request.user.board_memberships.count()
-    assigned_cards = request.user.assigned_cards.select_related('list__board').order_by('due_date')
+    assigned_cards = request.user.assigned_cards.filter(is_archived=False).select_related('list__board').order_by('due_date')
+    overdue_count = assigned_cards.filter(due_date__lt=today).exclude(status='completado').count()
+    completed_count = assigned_cards.filter(status='completado').count()
     return render(request, 'accounts/profile.html', {
-        'owned_count':    owned_count,
-        'member_count':   member_count,
-        'assigned_cards': assigned_cards,
-        'today':          timezone.localdate(),
+        'owned_count':     owned_count,
+        'member_count':    member_count,
+        'assigned_cards':  assigned_cards,
+        'overdue_count':   overdue_count,
+        'completed_count': completed_count,
+        'today':           today,
     })
 
 
@@ -54,7 +69,38 @@ def profile_edit(request):
     password_form = PasswordChangeForm(request.user)
 
     if request.method == 'POST':
-        if 'change_email' in request.POST:
+        if 'change_avatar' in request.POST:
+            avatar = request.FILES.get('avatar')
+            if avatar:
+                _delete_avatar_file(request.user.profile)
+                request.user.profile.avatar = avatar
+                request.user.profile.save()
+                messages.success(request, 'Foto de perfil actualizada.')
+            else:
+                messages.error(request, 'Seleccioná una imagen.')
+
+        elif 'remove_avatar' in request.POST:
+            _delete_avatar_file(request.user.profile)
+            request.user.profile.avatar = None
+            request.user.profile.save()
+            messages.success(request, 'Foto de perfil eliminada.')
+
+        elif 'change_username' in request.POST:
+            new_username = request.POST.get('username', '').strip()
+            if not new_username:
+                messages.error(request, 'Ingresá un nombre de usuario.')
+            elif User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                messages.error(request, f'"{new_username}" ya está en uso por otra cuenta.')
+            else:
+                request.user.username = new_username
+                try:
+                    request.user.full_clean(exclude=['password'])
+                    request.user.save()
+                    messages.success(request, 'Nombre de usuario actualizado.')
+                except ValidationError as e:
+                    messages.error(request, ' '.join(sum(e.message_dict.values(), [])))
+
+        elif 'change_email' in request.POST:
             new_email = request.POST.get('email', '').strip()
             if new_email:
                 request.user.email = new_email

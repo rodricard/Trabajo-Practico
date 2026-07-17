@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}{{ board.title }}{% endblock %}
 
 {% block content %}
@@ -6,6 +7,12 @@
     <div class="board-header-inner">
         <h1>{{ board.title }}</h1>
         <div class="board-actions">
+            <a href="{% url 'board_archived' board.pk %}" class="btn btn-ghost-light">
+                &#128230; Archivados{% if archived_count %} ({{ archived_count }}){% endif %}
+            </a>
+            <a href="{% url 'board_activity' board.pk %}" class="btn btn-ghost-light">
+                &#128337; Actividad
+            </a>
             {% if is_board_admin %}
             <a href="{% url 'board_members' board.pk %}" class="btn btn-ghost-light">Miembros</a>
             <a href="{% url 'board_update' board.pk %}" class="btn btn-ghost-light">Configurar</a>
@@ -22,6 +29,11 @@
             <a href="{% url 'board_list' %}" class="btn btn-ghost-light">&#8592; Tableros</a>
         </div>
     </div>
+</div>
+
+<div class="board-viewers" id="boardViewers" style="display:none;">
+    <span class="board-viewers-label">&#128065; Viendo ahora:</span>
+    <div class="board-viewers-avatars" id="boardViewersAvatars"></div>
 </div>
 
 <!-- Filtros -->
@@ -47,57 +59,7 @@
     <div class="kanban-wrapper">
         <div class="kanban-board">
             {% for lst in lists %}
-            <div class="kanban-list">
-                <div class="list-header">
-                    <h3 class="list-title">{{ lst.title }}</h3>
-                    <form method="post" action="{% url 'list_delete' lst.pk %}"
-                          onsubmit="return confirm('&#191;Eliminar lista y sus tarjetas?')">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-icon" title="Eliminar lista">&times;</button>
-                    </form>
-                </div>
-
-                <div class="cards-container" data-list-id="{{ lst.pk }}">
-                    {% for card in lst.cards.all %}
-                    <a href="{% url 'card_detail' card.pk %}" class="card-item"
-                       data-status="{{ card.status }}"
-                       data-assigned="{{ card.assigned_to.pk|default:'' }}">
-                        {% if card.labels.all %}
-                        <div class="card-labels">
-                            {% for label in card.labels.all %}
-                            <span class="card-label-dot" style="background:{{ label.hex_color }};" title="{{ label.name }}"></span>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        <span class="card-title">{{ card.title }}</span>
-                        <div class="card-meta">
-                            {% if card.due_date %}
-                            <span class="card-due {% if card.due_date < today %}card-due--vencida{% elif card.due_date == today %}card-due--hoy{% endif %}">
-                                &#128197; {{ card.due_date|date:"d/m" }}
-                                {% if card.due_date < today %}&#9888;{% elif card.due_date == today %}&#128308;{% endif %}
-                            </span>
-                            {% endif %}
-                            {% if card.assigned_to %}
-                            <span class="card-avatar" title="{{ card.assigned_to.username }}">
-                                {{ card.assigned_to.username|first|upper }}
-                            </span>
-                            {% endif %}
-                            {% if card.status != 'pendiente' %}
-                            <span class="card-status-dot card-status-dot--{{ card.status }}" title="{{ card.get_status_display }}"></span>
-                            {% endif %}
-                        </div>
-                    </a>
-                    {% empty %}
-                    <p class="list-empty">Sin tarjetas</p>
-                    {% endfor %}
-                </div>
-
-                <form method="post" action="{% url 'card_create' lst.pk %}" class="add-card-form">
-                    {% csrf_token %}
-                    {{ card_form.title }}
-                    <button type="submit" class="btn btn-ghost btn-sm">+ Agregar tarjeta</button>
-                </form>
-            </div>
+            {% include 'boards/_list_column.html' %}
             {% endfor %}
 
             <div class="kanban-list kanban-list--add">
@@ -121,19 +83,7 @@
 
         <div class="chat-messages" id="chatMessages">
             {% for msg in chat_messages %}
-            <div class="chat-msg {% if msg.is_system %}chat-msg--system{% endif %}">
-                {% if msg.is_system %}
-                <span class="chat-system-text">&#9432; {{ msg.content }}</span>
-                <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
-                {% else %}
-                <div class="chat-msg-header">
-                    <span class="chat-avatar">{{ msg.user.username|first|upper }}</span>
-                    <strong>{{ msg.user.username }}</strong>
-                    <span class="chat-time">{{ msg.created_at|date:"d/m H:i" }}</span>
-                </div>
-                <p class="chat-text">{{ msg.content }}</p>
-                {% endif %}
-            </div>
+            {% include 'boards/_chat_message.html' %}
             {% empty %}
             <p class="list-empty">Sin mensajes aún.</p>
             {% endfor %}
@@ -154,6 +104,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/vendor/sortable.min.js' %}"></script>
 <script>
     const chatBox = document.getElementById('chatMessages');
     if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
@@ -176,5 +127,97 @@
 
     document.getElementById('filterStatus').addEventListener('change', applyFilters);
     document.getElementById('filterAssigned').addEventListener('change', applyFilters);
+
+    // ── Drag & drop (SortableJS) ──────────────────────────────────────────
+    const csrfToken = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+
+    function postForm(url, params) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(params).toString(),
+        });
+    }
+
+    document.querySelectorAll('.cards-container').forEach(function (container) {
+        new Sortable(container, {
+            group: 'cards',
+            animation: 150,
+            onEnd: function (evt) {
+                const cardId = evt.item.dataset.cardId;
+                const listId = evt.to.dataset.listId;
+                postForm(`/boards/cards/${cardId}/mover/`, { list_id: listId, position: evt.newIndex });
+            },
+        });
+    });
+
+    const kanbanBoardEl = document.querySelector('.kanban-board');
+    if (kanbanBoardEl) {
+        new Sortable(kanbanBoardEl, {
+            animation: 150,
+            draggable: '.kanban-list:not(.kanban-list--add)',
+            handle: '.list-title',
+            preventOnFilter: false,
+            onEnd: function (evt) {
+                const container = evt.item.querySelector('.cards-container');
+                if (!container) return;
+                postForm(`/boards/lists/${container.dataset.listId}/reorder/`, { position: evt.newIndex });
+            },
+        });
+    }
+
+    // ── WebSocket: cambios del tablero en vivo ────────────────────────────
+    const boardId = {{ board.pk }};
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const boardSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/boards/${boardId}/`);
+
+    boardSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+
+        if (data.event === 'presence_update') {
+            const bar = document.getElementById('boardViewers');
+            const avatars = document.getElementById('boardViewersAvatars');
+            avatars.innerHTML = '';
+            data.viewers.forEach(function (username) {
+                const span = document.createElement('span');
+                span.className = 'member-avatar board-viewer-avatar';
+                span.title = username;
+                span.textContent = username.charAt(0).toUpperCase();
+                avatars.appendChild(span);
+            });
+            bar.style.display = data.viewers.length ? 'flex' : 'none';
+            return;
+        }
+
+        if (data.event === 'card_moved') {
+            const card = document.querySelector(`.card-item[data-card-id="${data.card_id}"]`);
+            const container = document.querySelector(`.cards-container[data-list-id="${data.list_id}"]`);
+            if (card && container) {
+                const emptyMsg = container.querySelector('.list-empty');
+                if (emptyMsg) emptyMsg.remove();
+                const siblings = Array.from(container.querySelectorAll(':scope > .card-item')).filter(el => el !== card);
+                container.insertBefore(card, siblings[data.position] || null);
+            }
+            return;
+        }
+
+        if (data.event === 'list_reordered') {
+            const container = document.querySelector(`.cards-container[data-list-id="${data.list_id}"]`);
+            const listEl = container ? container.closest('.kanban-list') : null;
+            const board = document.querySelector('.kanban-board');
+            if (listEl && board) {
+                const others = Array.from(board.querySelectorAll('.kanban-list:not(.kanban-list--add)')).filter(el => el !== listEl);
+                board.insertBefore(listEl, others[data.position] || board.querySelector('.kanban-list--add'));
+            }
+            return;
+        }
+
+        if (['card_created', 'card_deleted', 'card_updated', 'list_created', 'list_deleted'].includes(data.event)) {
+            location.reload();
+        }
+    };
 </script>
 {% endblock %}

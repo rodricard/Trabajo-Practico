@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Editar perfil — Tableo{% endblock %}
+{% block title %}Editar perfil — ListMeApp{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -9,39 +9,78 @@
     </div>
 </div>
 
-<div class="profile-grid">
+<div class="profile-edit-grid">
 
-    <!-- Cambiar correo -->
-    <div class="form-container">
-        <h2>&#9993; Cambiar correo</h2>
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="email">Nuevo correo</label>
-                <input type="email" name="email" id="email" value="{{ user.email }}" class="form-control" required>
-            </div>
-            <button type="submit" name="change_email" class="btn btn-primary">Guardar correo</button>
-        </form>
-    </div>
-
-    <!-- Cambiar contraseña -->
-    <div class="form-container">
-        <h2>&#128274; Cambiar contraseña</h2>
-        <form method="post">
-            {% csrf_token %}
-            {% for field in password_form %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}
-                <ul class="field-errors">
-                    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
-                </ul>
+    <div class="profile-edit-column">
+        <!-- Cambiar foto de perfil -->
+        <div class="form-container">
+            <h2>&#128247; Foto de perfil</h2>
+            <div class="avatar-edit-preview">
+                {% if user.profile.avatar %}
+                <img src="{{ user.profile.avatar.url }}" alt="{{ user.username }}" class="profile-avatar-large profile-avatar-large--img">
+                {% else %}
+                <span class="profile-avatar-large">{{ user.username|first|upper }}</span>
                 {% endif %}
             </div>
-            {% endfor %}
-            <button type="submit" name="change_password" class="btn btn-primary">Cambiar contraseña</button>
-        </form>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <input type="file" name="avatar" id="avatar" accept="image/*" class="form-control">
+                </div>
+                <button type="submit" name="change_avatar" class="btn btn-primary">Subir foto</button>
+                {% if user.profile.avatar %}
+                <button type="submit" name="remove_avatar" class="btn btn-ghost">Quitar foto</button>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Cambiar nombre de usuario -->
+        <div class="form-container">
+            <h2>&#128100; Nombre de usuario</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="username">Nuevo nombre de usuario</label>
+                    <input type="text" name="username" id="username" value="{{ user.username }}" class="form-control" required>
+                </div>
+                <button type="submit" name="change_username" class="btn btn-primary">Guardar nombre</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="profile-edit-column">
+        <!-- Cambiar correo -->
+        <div class="form-container">
+            <h2>&#9993; Cambiar correo</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="email">Nuevo correo</label>
+                    <input type="email" name="email" id="email" value="{{ user.email }}" class="form-control" required>
+                </div>
+                <button type="submit" name="change_email" class="btn btn-primary">Guardar correo</button>
+            </form>
+        </div>
+
+        <!-- Cambiar contraseña -->
+        <div class="form-container">
+            <h2>&#128274; Cambiar contraseña</h2>
+            <form method="post">
+                {% csrf_token %}
+                {% for field in password_form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <ul class="field-errors">
+                        {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" name="change_password" class="btn btn-primary">Cambiar contraseña</button>
+            </form>
+        </div>
     </div>
 
 </div>

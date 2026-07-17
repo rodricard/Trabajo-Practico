@@ -88,28 +88,20 @@
     <h2 class="section-title">Propios</h2>
     <div class="boards-grid">
         {% for board in owned_boards %}
-        <a href="{% url 'board_detail' board.pk %}" class="board-card" data-color="{{ board.background_color }}">
-            <span class="board-title">{{ board.title }}</span>
-            <span class="board-badge">Propietario</span>
-        </a>
+        {% include 'boards/_board_card.html' with badge='Propietario' %}
         {% endfor %}
     </div>
 </section>
 {% endif %}
 
-{% if member_boards %}
-<section>
+<section id="sharedBoardsSection" {% if not member_boards %}style="display:none;"{% endif %}>
     <h2 class="section-title">Compartidos conmigo</h2>
-    <div class="boards-grid">
+    <div class="boards-grid" id="sharedBoardsGrid">
         {% for board in member_boards %}
-        <a href="{% url 'board_detail' board.pk %}" class="board-card" data-color="{{ board.background_color }}">
-            <span class="board-title">{{ board.title }}</span>
-            <span class="board-badge">{{ board.owner.username }}</span>
-        </a>
+        {% include 'boards/_board_card.html' with badge=board.owner.username %}
         {% endfor %}
     </div>
 </section>
-{% endif %}
 
 {% if not owned_boards and not member_boards %}
 <div class="empty-state-large">
@@ -122,6 +114,37 @@
     document.querySelectorAll('.board-card[data-color]').forEach(function(el) {
         el.style.backgroundColor = el.getAttribute('data-color');
     });
+
+    {% if user.is_authenticated %}
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const boardListSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/notifications/`);
+    boardListSocket.onmessage = function (e) {
+        const data = JSON.parse(e.data);
+        if (data.event !== 'board_added') return;
+
+        const section = document.getElementById('sharedBoardsSection');
+        const grid = document.getElementById('sharedBoardsGrid');
+        if (!grid) return;
+
+        const card = document.createElement('a');
+        card.href = `/boards/${data.board_id}/`;
+        card.className = 'board-card';
+        card.style.backgroundColor = data.color || '#0079bf';
+
+        const title = document.createElement('span');
+        title.className = 'board-title';
+        title.textContent = data.title;
+
+        const badge = document.createElement('span');
+        badge.className = 'board-badge';
+        badge.textContent = data.owner || '';
+
+        card.appendChild(title);
+        card.appendChild(badge);
+        grid.appendChild(card);
+        section.style.display = '';
+    };
+    {% endif %}
 </script>
 
 {% endblock %}

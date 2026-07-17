@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load board_extras %}
 {% block title %}{{ card.title }}{% endblock %}
 
 {% block content %}
@@ -9,12 +10,23 @@
         </a>
         <h1>{{ card.title }}</h1>
     </div>
-    <form method="post" action="{% url 'card_delete' card.pk %}"
-          onsubmit="return confirm('¿Eliminar esta tarjeta?')">
+    {% if card.is_archived %}
+    <form method="post" action="{% url 'card_unarchive' card.pk %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Eliminar tarjeta</button>
+        <button type="submit" class="btn btn-ghost">Restaurar tarjeta</button>
     </form>
+    {% else %}
+    <form method="post" action="{% url 'card_delete' card.pk %}"
+          onsubmit="return confirm('¿Archivar esta tarjeta? Podés restaurarla después desde \'Archivados\'.')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Archivar tarjeta</button>
+    </form>
+    {% endif %}
 </div>
+
+{% if card.is_archived %}
+<div class="alert alert-warning">Esta tarjeta está archivada.</div>
+{% endif %}
 
 <div class="card-detail-layout">
 
@@ -47,6 +59,43 @@
             </div>
         </div>
 
+        <!-- Checklist -->
+        <div class="form-container" style="margin-top:1rem;">
+            <h3 style="margin-bottom:.5rem;">&#9745; Checklist ({{ checklist_done_count }}/{{ checklist_items|length }})</h3>
+
+            {% if checklist_items %}
+            <div class="checklist-progress">
+                <div class="checklist-progress-bar" style="width: {{ checklist_percent }}%;"></div>
+            </div>
+            {% endif %}
+
+            <ul class="checklist-list">
+                {% for item in checklist_items %}
+                <li class="checklist-item {% if item.is_done %}checklist-item--done{% endif %}">
+                    <form method="post" action="{% url 'checklist_item_toggle' item.pk %}" class="checklist-item-toggle-form">
+                        {% csrf_token %}
+                        <button type="submit" class="checklist-checkbox" aria-label="Marcar como {% if item.is_done %}pendiente{% else %}hecho{% endif %}">
+                            {% if item.is_done %}&#10003;{% endif %}
+                        </button>
+                    </form>
+                    <span class="checklist-item-text">{{ item.text }}</span>
+                    <form method="post" action="{% url 'checklist_item_delete' item.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-icon" title="Eliminar">&times;</button>
+                    </form>
+                </li>
+                {% empty %}
+                <p class="list-empty">Sin ítems en la checklist.</p>
+                {% endfor %}
+            </ul>
+
+            <form method="post" action="{% url 'checklist_item_add' card.pk %}" class="add-card-form" style="margin-top:.5rem;">
+                {% csrf_token %}
+                <input type="text" name="text" placeholder="Agregar ítem..." class="input-inline" autocomplete="off">
+                <button type="submit" class="btn btn-ghost btn-sm">+ Agregar</button>
+            </form>
+        </div>
+
         <!-- Comentarios -->
         <div class="form-container" style="margin-top:1rem;">
             <h3 style="margin-bottom:.75rem;">&#128172; Comentarios ({{ comments|length }})</h3>
@@ -59,14 +108,25 @@
                     </span>
                     <strong>{{ comment.author.username }}</strong>
                     <span class="chat-time">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+                    {% if comment.author == request.user %}
+                    <button type="button" class="btn-icon" style="opacity:1;" title="Editar"
+                            onclick="document.getElementById('edit-comment-{{ comment.pk }}').classList.toggle('is-hidden')">&#9998;</button>
+                    {% endif %}
                     {% if comment.author == request.user or is_board_admin %}
-                    <form method="post" action="{% url 'comment_delete' comment.pk %}" style="margin-left:auto;">
+                    <form method="post" action="{% url 'comment_delete' comment.pk %}" style="{% if comment.author != request.user %}margin-left:auto;{% endif %}">
                         {% csrf_token %}
                         <button type="submit" class="btn-icon" style="opacity:1;" title="Eliminar">&times;</button>
                     </form>
                     {% endif %}
                 </div>
-                <p class="comment-text">{{ comment.content }}</p>
+                <p class="comment-text">{{ comment.content|mentions }}</p>
+                {% if comment.author == request.user %}
+                <form method="post" action="{% url 'comment_edit' comment.pk %}" id="edit-comment-{{ comment.pk }}" class="is-hidden" style="margin-left:2rem; margin-top:.4rem;">
+                    {% csrf_token %}
+                    <textarea name="content" class="input-inline" rows="2" style="width:100%;">{{ comment.content }}</textarea>
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.3rem;">Guardar</button>
+                </form>
+                {% endif %}
             </div>
             {% empty %}
             <p class="list-empty">Sin comentarios aún.</p>
@@ -74,7 +134,10 @@
 
             <form method="post" action="{% url 'comment_add' card.pk %}" style="margin-top:.75rem;">
                 {% csrf_token %}
-                {{ comment_form.content }}
+                <div style="position:relative;">
+                    {{ comment_form.content }}
+                    <div class="mention-suggestions" id="mentionSuggestions"></div>
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.4rem;">Comentar</button>
             </form>
         </div>
@@ -87,16 +150,25 @@
             <h3 style="margin-bottom:.75rem;">&#127991; Etiquetas</h3>
 
             {% for label in board_labels %}
-            <form method="post" action="{% url 'label_toggle' card.pk %}">
-                {% csrf_token %}
-                <input type="hidden" name="label_id" value="{{ label.pk }}">
-                <button type="submit" class="label-toggle-btn {% if label in card.labels.all %}label-toggle-btn--active{% endif %}"
-                        style="background:{{ label.hex_color }};">
-                    {% if label in card.labels.all %}&#10003;{% endif %}
-                    {{ label.name }}
-                    <small>({{ label.get_color_display }})</small>
-                </button>
-            </form>
+            <div style="display:flex; align-items:center; gap:.35rem;">
+                <form method="post" action="{% url 'label_toggle' card.pk %}" style="flex:1;">
+                    {% csrf_token %}
+                    <input type="hidden" name="label_id" value="{{ label.pk }}">
+                    <button type="submit" class="label-toggle-btn {% if label in card.labels.all %}label-toggle-btn--active{% endif %}"
+                            style="background:{{ label.hex_color }};">
+                        {% if label in card.labels.all %}&#10003;{% endif %}
+                        {{ label.name }}
+                        <small>({{ label.get_color_display }})</small>
+                    </button>
+                </form>
+                {% if is_board_admin %}
+                <form method="post" action="{% url 'label_delete' label.pk %}"
+                      onsubmit="return confirm('&#191;Eliminar la etiqueta \'{{ label.name }}\'? Se quitar&aacute; de todas las tarjetas.')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-icon" style="opacity:1;" title="Eliminar etiqueta">&times;</button>
+                </form>
+                {% endif %}
+            </div>
             {% empty %}
             <p class="list-empty">Sin etiquetas en este tablero.</p>
             {% endfor %}
@@ -109,4 +181,66 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{{ mentionable_usernames|json_script:"mentionable-data" }}
+<script>
+(function () {
+    const MENTIONABLE = JSON.parse(document.getElementById('mentionable-data').textContent);
+    const textarea = document.getElementById('id_content');
+    const box = document.getElementById('mentionSuggestions');
+    if (!textarea || !box || !MENTIONABLE.length) return;
+
+    let activeStart = -1;
+
+    function currentMentionQuery() {
+        const pos = textarea.selectionStart;
+        const before = textarea.value.slice(0, pos);
+        const match = before.match(/@(\w*)$/);
+        if (!match) { activeStart = -1; return null; }
+        activeStart = pos - match[0].length;
+        return match[1];
+    }
+
+    function renderSuggestions(query) {
+        const matches = MENTIONABLE.filter(function (u) {
+            return u.toLowerCase().startsWith(query.toLowerCase());
+        }).slice(0, 6);
+
+        box.innerHTML = '';
+        if (!matches.length) { box.style.display = 'none'; return; }
+
+        matches.forEach(function (username) {
+            const item = document.createElement('div');
+            item.className = 'mention-suggestion';
+            item.textContent = '@' + username;
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                const pos = textarea.selectionStart;
+                const before = textarea.value.slice(0, activeStart);
+                const after = textarea.value.slice(pos);
+                textarea.value = before + '@' + username + ' ' + after;
+                const newPos = (before + '@' + username + ' ').length;
+                textarea.focus();
+                textarea.setSelectionRange(newPos, newPos);
+                box.innerHTML = '';
+                box.style.display = 'none';
+            });
+            box.appendChild(item);
+        });
+        box.style.display = 'block';
+    }
+
+    textarea.addEventListener('input', function () {
+        const query = currentMentionQuery();
+        if (query === null) { box.style.display = 'none'; return; }
+        renderSuggestions(query);
+    });
+
+    textarea.addEventListener('blur', function () {
+        setTimeout(function () { box.style.display = 'none'; }, 150);
+    });
+})();
+</script>
 {% endblock %}

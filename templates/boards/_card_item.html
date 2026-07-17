@@ -1,0 +1,29 @@
+<a href="{% url 'card_detail' card.pk %}" class="card-item"
+   data-card-id="{{ card.pk }}"
+   data-status="{{ card.status }}"
+   data-assigned="{{ card.assigned_to.pk|default:'' }}">
+    {% if card.labels.all %}
+    <div class="card-labels">
+        {% for label in card.labels.all %}
+        <span class="card-label-dot" style="background:{{ label.hex_color }};" title="{{ label.name }}"></span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <span class="card-title">{{ card.title }}</span>
+    <div class="card-meta">
+        {% if card.due_date %}
+        <span class="card-due {% if card.due_date < today %}card-due--vencida{% elif card.due_date == today %}card-due--hoy{% endif %}">
+            &#128197; {{ card.due_date|date:"d/m" }}
+            {% if card.due_date < today %}&#9888;{% elif card.due_date == today %}&#128308;{% endif %}
+        </span>
+        {% endif %}
+        {% if card.assigned_to %}
+        <span class="card-avatar" title="{{ card.assigned_to.username }}">
+            {{ card.assigned_to.username|first|upper }}
+        </span>
+        {% endif %}
+        {% if card.status != 'pendiente' %}
+        <span class="card-status-dot card-status-dot--{{ card.status }}" title="{{ card.get_status_display }}"></span>
+        {% endif %}
+    </div>
+</a>

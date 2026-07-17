@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Tableo{% endblock %}</title>
+    <title>{% block title %}ListMeApp{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
@@ -14,7 +14,7 @@
         {% if user.is_authenticated %}
         <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
         {% endif %}
-        <a href="{% url 'board_list' %}" class="topbar-brand">&#9670; Tableo</a>
+        <a href="{% url 'board_list' %}" class="topbar-brand">&#9670; ListMeApp</a>
         {% if user.is_authenticated %}
         <form method="get" action="{% url 'search' %}" class="topbar-search">
             <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar tarjetas..." class="search-input" autocomplete="off">
@@ -25,6 +25,26 @@
 
     {% if user.is_authenticated %}
     <div class="topbar-right">
+        <div class="nav-dropdown">
+            <button class="notif-bell-btn" id="notifBellToggle">
+                &#128276;
+                <span class="notif-badge" id="topNotifBadge" {% if not unread_notifications %}style="display:none;"{% endif %}>{{ unread_notifications }}</span>
+            </button>
+            <div class="notif-dropdown-menu" id="notifDropdownMenu">
+                <div class="notif-dropdown-header">Notificaciones</div>
+                <div class="notif-dropdown-list" id="notifDropdownList">
+                    {% for n in recent_notifications %}
+                    <a href="{{ n.link }}" class="notif-dropdown-item {% if not n.is_read %}notif-dropdown-item--unread{% endif %}">
+                        <span class="notif-dropdown-text">{{ n.title }}</span>
+                        <span class="notif-dropdown-time" data-created="{{ n.created_at.isoformat }}"></span>
+                    </a>
+                    {% empty %}
+                    <p class="notif-dropdown-empty" id="notifDropdownEmpty">Todavía no tenés notificaciones.</p>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'notifications_list' %}" class="notif-dropdown-footer">Ver todas</a>
+            </div>
+        </div>
         <div class="nav-dropdown">
             <button class="nav-avatar-btn" id="dropdownToggle">
                 <span class="nav-avatar-circle">{{ user.username|first|upper }}</span>
@@ -70,11 +90,11 @@
         <span class="sidebar-icon">&#128203;</span>
         <span class="sidebar-label">Tableros</span>
     </a>
-    <a href="{% url 'notifications_list' %}" class="sidebar-item">
+    <a href="{% url 'notifications_list' %}" class="sidebar-item" id="notifSidebarItem">
         <span class="sidebar-icon">&#128276;</span>
         <span class="sidebar-label">
             Notificaciones
-            {% if unread_notifications %}<span class="notif-badge">{{ unread_notifications }}</span>{% endif %}
+            <span class="notif-badge" id="notifBadge" {% if not unread_notifications %}style="display:none;"{% endif %}>{{ unread_notifications }}</span>
         </span>
     </a>
     <a href="{% url 'profile' %}" class="sidebar-item">
@@ -105,6 +125,10 @@
     </main>
 </div>
 
+{% if user.is_authenticated %}
+<div class="ws-toast-container" id="wsToastContainer"></div>
+{% endif %}
+
 <script>
     const toggle = document.getElementById('dropdownToggle');
     const menu   = document.getElementById('dropdownMenu');
@@ -119,6 +143,21 @@
             toggle.classList.remove('active');
         });
         menu.addEventListener('click', function(e) { e.stopPropagation(); });
+    }
+
+    const notifBellToggle  = document.getElementById('notifBellToggle');
+    const notifDropdownMenu = document.getElementById('notifDropdownMenu');
+    if (notifBellToggle && notifDropdownMenu) {
+        notifBellToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            notifDropdownMenu.classList.toggle('open');
+            notifBellToggle.classList.toggle('active');
+        });
+        document.addEventListener('click', function() {
+            notifDropdownMenu.classList.remove('open');
+            notifBellToggle.classList.remove('active');
+        });
+        notifDropdownMenu.addEventListener('click', function(e) { e.stopPropagation(); });
     }
 
     const sidebarToggle = document.getElementById('sidebarToggle');
@@ -139,6 +178,108 @@
         localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? '1' : '0');
     });
 </script>
+{% if user.is_authenticated %}
+<script>
+    (function () {
+        function timeAgo(isoString) {
+            if (!isoString) return '';
+            const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+            if (diff < 60) return 'justo ahora';
+            if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
+            if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
+            return `hace ${Math.floor(diff / 86400)} d`;
+        }
+
+        function refreshTimestamps() {
+            document.querySelectorAll('.notif-dropdown-time[data-created]').forEach(function (el) {
+                el.textContent = timeAgo(el.dataset.created);
+            });
+        }
+        refreshTimestamps();
+        setInterval(refreshTimestamps, 30000);
+
+        const badge = document.getElementById('notifBadge');
+        const topBadge = document.getElementById('topNotifBadge');
+        const dropdownList = document.getElementById('notifDropdownList');
+        const dropdownEmpty = document.getElementById('notifDropdownEmpty');
+        const notifBell = document.getElementById('notifBellToggle');
+        const sidebarItem = document.getElementById('notifSidebarItem');
+        const toastContainer = document.getElementById('wsToastContainer');
+        if (!badge && !topBadge) return;
+
+        function bumpBadges() {
+            [badge, topBadge].forEach(function (b) {
+                if (!b) return;
+                b.textContent = (parseInt(b.textContent, 10) || 0) + 1;
+                b.style.display = '';
+            });
+        }
+
+        function pulseBell() {
+            [sidebarItem, notifBell].forEach(function (el) {
+                if (!el) return;
+                el.classList.add('sidebar-item--pulse');
+                setTimeout(function () { el.classList.remove('sidebar-item--pulse'); }, 800);
+            });
+        }
+
+        function prependToDropdown(data) {
+            if (!dropdownList) return;
+            if (dropdownEmpty) dropdownEmpty.remove();
+            const item = document.createElement('a');
+            item.href = data.link || '#';
+            item.className = 'notif-dropdown-item notif-dropdown-item--unread notif-dropdown-item--enter';
+            item.innerHTML = `<span class="notif-dropdown-text"></span><span class="notif-dropdown-time"></span>`;
+            item.querySelector('.notif-dropdown-text').textContent = data.title;
+            item.querySelector('.notif-dropdown-time').textContent = timeAgo(data.created_at);
+            dropdownList.prepend(item);
+            setTimeout(function () { item.classList.remove('notif-dropdown-item--enter'); }, 400);
+
+            while (dropdownList.children.length > 6) {
+                dropdownList.lastElementChild.remove();
+            }
+        }
+
+        function showToast(text, link) {
+            if (!toastContainer) return;
+            const toast = document.createElement('a');
+            toast.className = 'ws-toast';
+            toast.href = link || '#';
+            toast.textContent = text;
+            toastContainer.appendChild(toast);
+            setTimeout(function () { toast.remove(); }, 5000);
+        }
+
+        let burstQueue = [];
+        let burstTimer = null;
+        function queueToast(data) {
+            burstQueue.push(data);
+            clearTimeout(burstTimer);
+            burstTimer = setTimeout(function () {
+                if (burstQueue.length === 1) {
+                    showToast(burstQueue[0].title, burstQueue[0].link);
+                } else {
+                    showToast(`${burstQueue.length} notificaciones nuevas`, '{% url "notifications_list" %}');
+                }
+                burstQueue = [];
+            }, 600);
+        }
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const notifSocket = new WebSocket(`${wsProtocol}://${window.location.host}/ws/notifications/`);
+
+        notifSocket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            if (data.event === 'notification') {
+                bumpBadges();
+                pulseBell();
+                prependToDropdown(data);
+                queueToast(data);
+            }
+        };
+    })();
+</script>
+{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>

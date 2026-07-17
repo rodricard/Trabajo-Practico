@@ -1,0 +1,30 @@
+<div class="summary-cards">
+    <div class="summary-card summary-card--total">
+        <span class="summary-icon">&#128203;</span>
+        <div>
+            <span class="summary-value">{{ owned_count }}</span>
+            <span class="summary-label">Tableros propios</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--proceso">
+        <span class="summary-icon">&#128101;</span>
+        <div>
+            <span class="summary-value">{{ member_count }}</span>
+            <span class="summary-label">Como miembro</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--pendiente">
+        <span class="summary-icon">&#128204;</span>
+        <div>
+            <span class="summary-value">{{ assigned_cards|length }}</span>
+            <span class="summary-label">Tarjetas asignadas</span>
+        </div>
+    </div>
+    <div class="summary-card summary-card--vencido">
+        <span class="summary-icon">&#9200;</span>
+        <div>
+            <span class="summary-value">{{ overdue_count }}</span>
+            <span class="summary-label">Vencidas</span>
+        </div>
+    </div>
+</div>
