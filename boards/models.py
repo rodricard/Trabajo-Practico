@@ -1,12 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
 class Board(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_boards')
     members = models.ManyToManyField(User, through='BoardMember', related_name='boards')
     background_color = models.CharField(max_length=7, default='#0079bf')
+    is_chat_locked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -15,6 +17,20 @@ class Board(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class BoardMessage(models.Model):
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='chat_messages')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='board_messages')
+    content = models.TextField()
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'[{self.board.title}] {self.content[:40]}'
 
 
 class BoardMember(models.Model):
@@ -39,6 +55,7 @@ class List(models.Model):
     title = models.CharField(max_length=200)
     board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='lists')
     position = models.PositiveIntegerField(default=0)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -46,6 +63,29 @@ class List(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.board.title})'
+
+
+class Label(models.Model):
+    COLOR_CHOICES = [
+        ('urgente', 'Urgente'),
+        ('normal', 'Normal'),
+        ('baja', 'Baja'),
+    ]
+    COLOR_HEX = {
+        'urgente': '#eb5a46',
+        'normal':  '#f6ae2d',
+        'baja':    '#61bd4f',
+    }
+    name = models.CharField(max_length=50)
+    color = models.CharField(max_length=20, choices=COLOR_CHOICES, default='normal')
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='labels')
+
+    def __str__(self):
+        return f'{self.name} ({self.board.title})'
+
+    @property
+    def hex_color(self):
+        return self.COLOR_HEX.get(self.color, '#dfe1e6')
 
 
 class Card(models.Model):
@@ -63,7 +103,9 @@ class Card(models.Model):
     assigned_to = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_cards'
     )
+    labels = models.ManyToManyField(Label, blank=True, related_name='cards')
     due_date = models.DateField(null=True, blank=True)
+    is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -72,3 +114,16 @@ class Card(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Comment(models.Model):
+    card = models.ForeignKey(Card, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.author.username} en {self.card.title}'

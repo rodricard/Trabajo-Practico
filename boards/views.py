@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.db.models import Prefetch
 from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -36,7 +37,7 @@ def board_list(request):
     member_of = Board.objects.filter(board_members__user=request.user).exclude(owner=request.user)
 
     today = timezone.localdate()
-    mis_cards = Card.objects.filter(assigned_to=request.user)
+    mis_cards = Card.objects.filter(assigned_to=request.user, is_archived=False)
 
     total       = mis_cards.count()
     pendientes  = mis_cards.filter(status='pendiente').count()
@@ -84,7 +85,13 @@ def board_detail(request, pk):
     board = get_object_or_404(Board, pk=pk)
     if not _is_member(request.user, board):
         return HttpResponseForbidden('No tienes acceso a este tablero.')
-    lists = board.lists.prefetch_related('cards__assigned_to').all()
+    lists = board.lists.filter(is_archived=False).prefetch_related(
+        Prefetch('cards', queryset=Card.objects.filter(is_archived=False).select_related('assigned_to'))
+    )
+    archived_count = (
+        board.lists.filter(is_archived=True).count()
+        + Card.objects.filter(list__board=board, is_archived=True).count()
+    )
     return render(request, 'boards/board_detail.html', {
         'board':          board,
         'lists':          lists,
@@ -92,6 +99,7 @@ def board_detail(request, pk):
         'card_form':      CardQuickForm(),
         'is_owner':       _is_owner(request.user, board),
         'is_board_admin': _is_board_admin(request.user, board),
+        'archived_count': archived_count,
     })
 
 
@@ -125,6 +133,21 @@ def board_delete(request, pk):
         messages.success(request, 'Tablero eliminado.')
         return redirect('board_list')
     return render(request, 'boards/board_confirm_delete.html', {'board': board})
+
+
+@login_required
+def board_archived(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    archived_lists = board.lists.filter(is_archived=True).order_by('title')
+    archived_cards = Card.objects.filter(list__board=board, is_archived=True) \
+        .select_related('list').order_by('title')
+    return render(request, 'boards/board_archived.html', {
+        'board': board,
+        'archived_lists': archived_lists,
+        'archived_cards': archived_cards,
+    })
 
 
 @login_required
@@ -239,10 +262,39 @@ def list_delete(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
-        list_id = lst.pk
-        lst.delete()
-        broadcast_board_event(board.pk, 'list_deleted', list_id=list_id)
+        lst.is_archived = True
+        lst.save(update_fields=['is_archived'])
+        lst.cards.filter(is_archived=False).update(is_archived=True)
+        broadcast_board_event(board.pk, 'list_deleted', list_id=lst.pk)
+        messages.success(request, f'Lista "{lst.title}" archivada.')
     return redirect('board_detail', pk=board.pk)
+
+
+@login_required
+def list_unarchive(request, pk):
+    lst = get_object_or_404(List, pk=pk)
+    board = lst.board
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        lst.is_archived = False
+        lst.position = board.lists.filter(is_archived=False).count()
+        lst.save(update_fields=['is_archived', 'position'])
+        broadcast_board_event(board.pk, 'list_created', list_id=lst.pk, title=lst.title, position=lst.position)
+        messages.success(request, f'Lista "{lst.title}" restaurada.')
+    return redirect('board_archived', pk=board.pk)
+
+
+@login_required
+def list_delete_permanent(request, pk):
+    lst = get_object_or_404(List, pk=pk, is_archived=True)
+    board = lst.board
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        lst.delete()
+        messages.success(request, 'Lista eliminada definitivamente.')
+    return redirect('board_archived', pk=board.pk)
 
 
 @login_required
@@ -257,7 +309,7 @@ def list_reorder(request, pk):
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Posición inválida.'}, status=400)
 
-    lists = list(board.lists.exclude(pk=lst.pk).order_by('position'))
+    lists = list(board.lists.filter(is_archived=False).exclude(pk=lst.pk).order_by('position'))
     new_position = max(0, min(new_position, len(lists)))
     lists.insert(new_position, lst)
     _reindex(lists)
@@ -276,7 +328,7 @@ def card_create(request, list_pk):
         if form.is_valid():
             card = form.save(commit=False)
             card.list = lst
-            card.position = lst.cards.count()
+            card.position = lst.cards.filter(is_archived=False).count()
             card.save()
             broadcast_board_event(lst.board.pk, 'card_created', card_id=card.pk, list_id=lst.pk, title=card.title, position=card.position)
     return redirect('board_detail', pk=lst.board.pk)
@@ -298,7 +350,7 @@ def card_move(request, pk):
 
     source_list = card.list
 
-    target_cards = list(target_list.cards.exclude(pk=card.pk).order_by('position'))
+    target_cards = list(target_list.cards.filter(is_archived=False).exclude(pk=card.pk).order_by('position'))
     new_position = max(0, min(new_position, len(target_cards)))
     target_cards.insert(new_position, card)
     _reindex(target_cards)
@@ -306,7 +358,7 @@ def card_move(request, pk):
     if source_list.pk != target_list.pk:
         card.list = target_list
         card.save(update_fields=['list'])
-        _reindex(source_list.cards.order_by('position'))
+        _reindex(source_list.cards.filter(is_archived=False).order_by('position'))
 
     broadcast_board_event(board.pk, 'card_moved', card_id=card.pk, list_id=target_list.pk, position=new_position)
 
@@ -350,7 +402,42 @@ def card_delete(request, pk):
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
     if request.method == 'POST':
-        card_id = card.pk
-        card.delete()
-        broadcast_board_event(board.pk, 'card_deleted', card_id=card_id)
+        card.is_archived = True
+        card.save(update_fields=['is_archived'])
+        broadcast_board_event(board.pk, 'card_deleted', card_id=card.pk)
+        messages.success(request, f'Tarjeta "{card.title}" archivada.')
     return redirect('board_detail', pk=board.pk)
+
+
+@login_required
+def card_unarchive(request, pk):
+    card = get_object_or_404(Card, pk=pk)
+    board = card.list.board
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        card.is_archived = False
+        card.position = card.list.cards.filter(is_archived=False).count()
+        card.save(update_fields=['is_archived', 'position'])
+        if card.list.is_archived:
+            card.list.is_archived = False
+            card.list.position = board.lists.filter(is_archived=False).count()
+            card.list.save(update_fields=['is_archived', 'position'])
+        broadcast_board_event(
+            board.pk, 'card_created',
+            card_id=card.pk, list_id=card.list.pk, title=card.title, position=card.position,
+        )
+        messages.success(request, f'Tarjeta "{card.title}" restaurada.')
+    return redirect('board_archived', pk=board.pk)
+
+
+@login_required
+def card_delete_permanent(request, pk):
+    card = get_object_or_404(Card, pk=pk, is_archived=True)
+    board = card.list.board
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        card.delete()
+        messages.success(request, 'Tarjeta eliminada definitivamente.')
+    return redirect('board_archived', pk=board.pk)

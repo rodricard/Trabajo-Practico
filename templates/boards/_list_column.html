@@ -2,9 +2,9 @@
     <div class="list-header">
         <h3 class="list-title">{{ lst.title }}</h3>
         <form method="post" action="{% url 'list_delete' lst.pk %}"
-              onsubmit="return confirm('&#191;Eliminar lista y sus tarjetas?')">
+              onsubmit="return confirm('&#191;Archivar esta lista y sus tarjetas? Podés restaurarla despu&eacute;s desde \'Archivados\'.')">
             {% csrf_token %}
-            <button type="submit" class="btn-icon" title="Eliminar lista">&times;</button>
+            <button type="submit" class="btn-icon" title="Archivar lista">&times;</button>
         </form>
     </div>
 

@@ -49,7 +49,7 @@ def profile(request):
     today = timezone.localdate()
     owned_count = request.user.owned_boards.count()
     member_count = request.user.board_memberships.count()
-    assigned_cards = request.user.assigned_cards.select_related('list__board').order_by('due_date')
+    assigned_cards = request.user.assigned_cards.filter(is_archived=False).select_related('list__board').order_by('due_date')
     overdue_count = assigned_cards.filter(due_date__lt=today).exclude(status='completado').count()
     completed_count = assigned_cards.filter(status='completado').count()
     return render(request, 'accounts/profile.html', {

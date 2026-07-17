@@ -9,12 +9,23 @@
         </a>
         <h1>Editar tarjeta</h1>
     </div>
-    <form method="post" action="{% url 'card_delete' card.pk %}"
-          onsubmit="return confirm('¿Eliminar esta tarjeta?')">
+    {% if card.is_archived %}
+    <form method="post" action="{% url 'card_unarchive' card.pk %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Eliminar tarjeta</button>
+        <button type="submit" class="btn btn-ghost">Restaurar tarjeta</button>
     </form>
+    {% else %}
+    <form method="post" action="{% url 'card_delete' card.pk %}"
+          onsubmit="return confirm('¿Archivar esta tarjeta? Podés restaurarla después desde \'Archivados\'.')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Archivar tarjeta</button>
+    </form>
+    {% endif %}
 </div>
+
+{% if card.is_archived %}
+<div class="alert alert-warning">Esta tarjeta está archivada.</div>
+{% endif %}
 
 <div class="form-container">
     <form method="post">
