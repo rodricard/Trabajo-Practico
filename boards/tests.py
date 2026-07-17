@@ -478,3 +478,87 @@ class PresenceTests(TestCase):
         self.assertEqual(payload['viewers'], ['owner'])
 
         await comm1.disconnect()
+
+
+class LabelDeleteTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.member = User.objects.create_user('member', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        BoardMember.objects.create(board=self.board, user=self.member, role='member')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.label = Label.objects.create(name='Urgente', color='urgente', board=self.board)
+        self.card.labels.add(self.label)
+
+    def test_admin_can_delete_label(self):
+        self.client.login(username='owner', password='pass12345')
+        self.client.post(reverse('label_delete', args=[self.label.pk]))
+        self.assertFalse(Label.objects.filter(pk=self.label.pk).exists())
+
+    def test_deleting_label_removes_it_from_cards(self):
+        self.client.login(username='owner', password='pass12345')
+        self.client.post(reverse('label_delete', args=[self.label.pk]))
+        self.assertEqual(self.card.labels.count(), 0)
+
+    def test_non_admin_cannot_delete_label(self):
+        self.client.login(username='member', password='pass12345')
+        response = self.client.post(reverse('label_delete', args=[self.label.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Label.objects.filter(pk=self.label.pk).exists())
+
+
+class CommentEditTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.other = User.objects.create_user('other', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        BoardMember.objects.create(board=self.board, user=self.other, role='member')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.comment = Comment.objects.create(card=self.card, author=self.owner, content='Original')
+
+    def test_author_can_edit_own_comment(self):
+        self.client.login(username='owner', password='pass12345')
+        self.client.post(reverse('comment_edit', args=[self.comment.pk]), {'content': 'Editado'})
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.content, 'Editado')
+
+    def test_blank_edit_is_ignored(self):
+        self.client.login(username='owner', password='pass12345')
+        self.client.post(reverse('comment_edit', args=[self.comment.pk]), {'content': '   '})
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.content, 'Original')
+
+    def test_non_author_cannot_edit_comment(self):
+        self.client.login(username='other', password='pass12345')
+        response = self.client.post(reverse('comment_edit', args=[self.comment.pk]), {'content': 'Hackeado'})
+        self.assertEqual(response.status_code, 403)
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.content, 'Original')
+
+
+class SearchImprovementTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.board = Board.objects.create(title='Proyecto Escuela', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        self.lst = List.objects.create(title='Backlog', board=self.board, position=0)
+        self.card = Card.objects.create(
+            title='Tarea sin pistas', description='Revisar el modulo de pagos', list=self.lst, position=0,
+        )
+        self.client.login(username='owner', password='pass12345')
+
+    def test_search_matches_description(self):
+        response = self.client.get(reverse('search'), {'q': 'pagos'})
+        self.assertIn(self.card, list(response.context['results']))
+
+    def test_search_matches_list_title(self):
+        response = self.client.get(reverse('search'), {'q': 'Backlog'})
+        self.assertIn(self.card, list(response.context['results']))
+
+    def test_search_matches_board_title(self):
+        response = self.client.get(reverse('search'), {'q': 'Proyecto Escuela'})
+        self.assertIn(self.card, list(response.context['results']))

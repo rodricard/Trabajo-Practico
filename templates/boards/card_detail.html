@@ -108,14 +108,25 @@
                     </span>
                     <strong>{{ comment.author.username }}</strong>
                     <span class="chat-time">{{ comment.created_at|date:"d/m/Y H:i" }}</span>
+                    {% if comment.author == request.user %}
+                    <button type="button" class="btn-icon" style="opacity:1;" title="Editar"
+                            onclick="document.getElementById('edit-comment-{{ comment.pk }}').classList.toggle('is-hidden')">&#9998;</button>
+                    {% endif %}
                     {% if comment.author == request.user or is_board_admin %}
-                    <form method="post" action="{% url 'comment_delete' comment.pk %}" style="margin-left:auto;">
+                    <form method="post" action="{% url 'comment_delete' comment.pk %}" style="{% if comment.author != request.user %}margin-left:auto;{% endif %}">
                         {% csrf_token %}
                         <button type="submit" class="btn-icon" style="opacity:1;" title="Eliminar">&times;</button>
                     </form>
                     {% endif %}
                 </div>
                 <p class="comment-text">{{ comment.content|mentions }}</p>
+                {% if comment.author == request.user %}
+                <form method="post" action="{% url 'comment_edit' comment.pk %}" id="edit-comment-{{ comment.pk }}" class="is-hidden" style="margin-left:2rem; margin-top:.4rem;">
+                    {% csrf_token %}
+                    <textarea name="content" class="input-inline" rows="2" style="width:100%;">{{ comment.content }}</textarea>
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-top:.3rem;">Guardar</button>
+                </form>
+                {% endif %}
             </div>
             {% empty %}
             <p class="list-empty">Sin comentarios aún.</p>
@@ -139,16 +150,25 @@
             <h3 style="margin-bottom:.75rem;">&#127991; Etiquetas</h3>
 
             {% for label in board_labels %}
-            <form method="post" action="{% url 'label_toggle' card.pk %}">
-                {% csrf_token %}
-                <input type="hidden" name="label_id" value="{{ label.pk }}">
-                <button type="submit" class="label-toggle-btn {% if label in card.labels.all %}label-toggle-btn--active{% endif %}"
-                        style="background:{{ label.hex_color }};">
-                    {% if label in card.labels.all %}&#10003;{% endif %}
-                    {{ label.name }}
-                    <small>({{ label.get_color_display }})</small>
-                </button>
-            </form>
+            <div style="display:flex; align-items:center; gap:.35rem;">
+                <form method="post" action="{% url 'label_toggle' card.pk %}" style="flex:1;">
+                    {% csrf_token %}
+                    <input type="hidden" name="label_id" value="{{ label.pk }}">
+                    <button type="submit" class="label-toggle-btn {% if label in card.labels.all %}label-toggle-btn--active{% endif %}"
+                            style="background:{{ label.hex_color }};">
+                        {% if label in card.labels.all %}&#10003;{% endif %}
+                        {{ label.name }}
+                        <small>({{ label.get_color_display }})</small>
+                    </button>
+                </form>
+                {% if is_board_admin %}
+                <form method="post" action="{% url 'label_delete' label.pk %}"
+                      onsubmit="return confirm('&#191;Eliminar la etiqueta \'{{ label.name }}\'? Se quitar&aacute; de todas las tarjetas.')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-icon" style="opacity:1;" title="Eliminar etiqueta">&times;</button>
+                </form>
+                {% endif %}
+            </div>
             {% empty %}
             <p class="list-empty">Sin etiquetas en este tablero.</p>
             {% endfor %}

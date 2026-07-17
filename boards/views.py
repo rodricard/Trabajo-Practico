@@ -4,7 +4,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -526,6 +526,19 @@ def comment_delete(request, pk):
 
 @login_required
 @require_POST
+def comment_edit(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    if comment.author != request.user:
+        return HttpResponseForbidden()
+    content = request.POST.get('content', '').strip()
+    if content:
+        comment.content = content
+        comment.save(update_fields=['content'])
+    return redirect('card_detail', pk=comment.card_id)
+
+
+@login_required
+@require_POST
 def label_toggle(request, card_pk):
     card = get_object_or_404(Card, pk=card_pk)
     if not _is_member(request.user, card.list.board):
@@ -547,10 +560,13 @@ def search(request):
     if query:
         user_boards = Board.objects.filter(board_members__user=request.user)
         results = Card.objects.filter(
+            Q(title__icontains=query)
+            | Q(description__icontains=query)
+            | Q(list__title__icontains=query)
+            | Q(list__board__title__icontains=query),
             list__board__in=user_boards,
-            title__icontains=query,
             is_archived=False,
-        ).select_related('list__board', 'assigned_to').order_by('list__board__title', 'title')
+        ).select_related('list__board', 'assigned_to').distinct().order_by('list__board__title', 'title')
     return render(request, 'boards/search_results.html', {
         'query':   query,
         'results': results,
@@ -573,6 +589,18 @@ def label_create(request, board_pk):
     else:
         form = LabelForm()
     return render(request, 'boards/label_form.html', {'form': form, 'board': board})
+
+
+@login_required
+@require_POST
+def label_delete(request, pk):
+    label = get_object_or_404(Label, pk=pk)
+    board = label.board
+    if not _is_board_admin(request.user, board):
+        return HttpResponseForbidden()
+    label.delete()
+    messages.success(request, 'Etiqueta eliminada.')
+    return redirect('board_detail', pk=board.pk)
 
 
 @login_required

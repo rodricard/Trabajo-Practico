@@ -1164,6 +1164,7 @@ a { color: inherit; text-decoration: none; }
     font-size: .8rem; color: #5e6c84; margin-bottom: .3rem;
 }
 .comment-text { font-size: .875rem; color: #172b4d; margin-left: 2rem; }
+.is-hidden { display: none; }
 
 .mention {
     background: #e4f0fc; color: #0079bf; font-weight: 600;
