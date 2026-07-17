@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from groups.models import Notification
 
-from .models import Board, BoardMember, Card, Label, List
+from .models import Board, BoardMember, Card, ChecklistItem, Label, List
 
 
 class BoardModelTests(TestCase):
@@ -225,3 +225,47 @@ class ArchiveInsteadOfDeleteTests(TestCase):
         self.client.post(reverse('card_delete', args=[self.card2.pk]))
         response = self.client.get(reverse('search'), {'q': 'C2'})
         self.assertNotIn(self.card2, list(response.context['results']))
+
+
+class ChecklistTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.outsider = User.objects.create_user('outsider', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.client.login(username='owner', password='pass12345')
+
+    def test_add_item(self):
+        self.client.post(reverse('checklist_item_add', args=[self.card.pk]), {'text': 'Paso uno'})
+        self.assertEqual(self.card.checklist_items.count(), 1)
+        self.assertEqual(self.card.checklist_items.first().text, 'Paso uno')
+
+    def test_blank_text_is_ignored(self):
+        self.client.post(reverse('checklist_item_add', args=[self.card.pk]), {'text': '   '})
+        self.assertEqual(self.card.checklist_items.count(), 0)
+
+    def test_toggle_flips_done_state(self):
+        item = ChecklistItem.objects.create(card=self.card, text='Paso', position=0)
+        self.client.post(reverse('checklist_item_toggle', args=[item.pk]))
+        item.refresh_from_db()
+        self.assertTrue(item.is_done)
+        self.client.post(reverse('checklist_item_toggle', args=[item.pk]))
+        item.refresh_from_db()
+        self.assertFalse(item.is_done)
+
+    def test_delete_removes_item(self):
+        item = ChecklistItem.objects.create(card=self.card, text='Paso', position=0)
+        self.client.post(reverse('checklist_item_delete', args=[item.pk]))
+        self.assertFalse(ChecklistItem.objects.filter(pk=item.pk).exists())
+
+    def test_outsider_cannot_modify_checklist(self):
+        item = ChecklistItem.objects.create(card=self.card, text='Paso', position=0)
+        self.client.logout()
+        self.client.login(username='outsider', password='pass12345')
+
+        response = self.client.post(reverse('checklist_item_toggle', args=[item.pk]))
+        self.assertEqual(response.status_code, 403)
+        item.refresh_from_db()
+        self.assertFalse(item.is_done)

@@ -23,4 +23,7 @@ urlpatterns = [
     path('cards/<int:pk>/delete/', views.card_delete, name='card_delete'),
     path('cards/<int:pk>/restaurar/', views.card_unarchive, name='card_unarchive'),
     path('cards/<int:pk>/eliminar-definitivo/', views.card_delete_permanent, name='card_delete_permanent'),
+    path('cards/<int:card_pk>/checklist/agregar/', views.checklist_item_add, name='checklist_item_add'),
+    path('checklist/<int:pk>/toggle/', views.checklist_item_toggle, name='checklist_item_toggle'),
+    path('checklist/<int:pk>/eliminar/', views.checklist_item_delete, name='checklist_item_delete'),
 ]

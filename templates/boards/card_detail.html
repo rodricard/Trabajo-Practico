@@ -52,4 +52,41 @@
         <p><small>Actualizada: {{ card.updated_at|date:"d/m/Y H:i" }}</small></p>
     </div>
 </div>
+
+<!-- Checklist -->
+<div class="form-container" style="margin-top:1rem;">
+    <h3 style="margin-bottom:.5rem;">&#9745; Checklist ({{ checklist_done_count }}/{{ checklist_items|length }})</h3>
+
+    {% if checklist_items %}
+    <div class="checklist-progress">
+        <div class="checklist-progress-bar" style="width: {{ checklist_percent }}%;"></div>
+    </div>
+    {% endif %}
+
+    <ul class="checklist-list">
+        {% for item in checklist_items %}
+        <li class="checklist-item {% if item.is_done %}checklist-item--done{% endif %}">
+            <form method="post" action="{% url 'checklist_item_toggle' item.pk %}" class="checklist-item-toggle-form">
+                {% csrf_token %}
+                <button type="submit" class="checklist-checkbox" aria-label="Marcar como {% if item.is_done %}pendiente{% else %}hecho{% endif %}">
+                    {% if item.is_done %}&#10003;{% endif %}
+                </button>
+            </form>
+            <span class="checklist-item-text">{{ item.text }}</span>
+            <form method="post" action="{% url 'checklist_item_delete' item.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn-icon" title="Eliminar">&times;</button>
+            </form>
+        </li>
+        {% empty %}
+        <p class="list-empty">Sin ítems en la checklist.</p>
+        {% endfor %}
+    </ul>
+
+    <form method="post" action="{% url 'checklist_item_add' card.pk %}" class="add-card-form" style="margin-top:.5rem;">
+        {% csrf_token %}
+        <input type="text" name="text" placeholder="Agregar ítem..." class="input-inline" autocomplete="off">
+        <button type="submit" class="btn btn-ghost btn-sm">+ Agregar</button>
+    </form>
+</div>
 {% endblock %}

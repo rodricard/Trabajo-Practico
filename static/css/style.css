@@ -661,6 +661,28 @@ a { color: inherit; text-decoration: none; }
 .card-list li small { color: #5e6c84; }
 .card-info { margin-top: 1rem; color: #5e6c84; }
 
+/* ---- Checklist ---- */
+.checklist-progress {
+    height: 8px; background: #dfe1e6; border-radius: 4px; overflow: hidden; margin-bottom: .75rem;
+}
+.checklist-progress-bar { height: 100%; background: #61bd4f; transition: width .2s ease; }
+
+.checklist-list { list-style: none; }
+.checklist-item {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .3rem 0; font-size: .875rem;
+}
+.checklist-item-toggle-form { display: inline-flex; }
+.checklist-checkbox {
+    width: 20px; height: 20px; flex-shrink: 0;
+    border: 2px solid #dfe1e6; border-radius: 4px; background: #fff;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; color: #fff; padding: 0;
+}
+.checklist-item--done .checklist-checkbox { background: #61bd4f; border-color: #61bd4f; }
+.checklist-item-text { flex: 1; }
+.checklist-item--done .checklist-item-text { color: #5e6c84; text-decoration: line-through; }
+
 .archived-item { flex-direction: row !important; align-items: center; justify-content: space-between; gap: .75rem; }
 .archived-actions { display: flex; gap: .5rem; flex-shrink: 0; }
 
@@ -935,6 +957,12 @@ body.dark-mode .alert-error   { background: #2c0b0e; color: #ea868f; border-colo
 body.dark-mode .search-result-item { border-color: #0f3460; color: #e0e0e0; }
 body.dark-mode .search-result-item:hover { background: #0f3460; }
 body.dark-mode .search-result-item small { color: #a0a0b0; }
+
+body.dark-mode .checklist-progress { background: #0f3460; }
+body.dark-mode .checklist-checkbox { background: #0f3460; border-color: #1a4a7a; }
+body.dark-mode .checklist-item--done .checklist-checkbox { background: #61bd4f; border-color: #61bd4f; }
+body.dark-mode .checklist-item-text { color: #e0e0e0; }
+body.dark-mode .checklist-item--done .checklist-item-text { color: #a0a0b0; }
 
 body.dark-mode .card,
 body.dark-mode .summary-card { background: #16213e; color: #e0e0e0; }

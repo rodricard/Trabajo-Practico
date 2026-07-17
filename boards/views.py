@@ -7,7 +7,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Board, BoardMember, List, Card
+from .models import Board, BoardMember, List, Card, ChecklistItem
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
 from .realtime import broadcast_board_event
 from groups.utils import notify_user, broadcast_user_event
@@ -371,6 +371,10 @@ def card_detail(request, pk):
     board = card.list.board
     if not _is_member(request.user, board):
         return HttpResponseForbidden()
+    checklist_items = card.checklist_items.all()
+    checklist_total = checklist_items.count()
+    checklist_done = checklist_items.filter(is_done=True).count()
+    checklist_percent = round(checklist_done * 100 / checklist_total) if checklist_total else 0
     board_users = User.objects.filter(board_memberships__board=board)
     if request.method == 'POST':
         prev_assigned = card.assigned_to
@@ -392,6 +396,9 @@ def card_detail(request, pk):
         'board':    board,
         'form':     form,
         'is_owner': _is_owner(request.user, board),
+        'checklist_items': checklist_items,
+        'checklist_done_count': checklist_done,
+        'checklist_percent': checklist_percent,
     })
 
 
@@ -441,3 +448,39 @@ def card_delete_permanent(request, pk):
         card.delete()
         messages.success(request, 'Tarjeta eliminada definitivamente.')
     return redirect('board_archived', pk=board.pk)
+
+
+@login_required
+@require_POST
+def checklist_item_add(request, card_pk):
+    card = get_object_or_404(Card, pk=card_pk)
+    if not _is_member(request.user, card.list.board):
+        return HttpResponseForbidden()
+    text = request.POST.get('text', '').strip()
+    if text:
+        ChecklistItem.objects.create(
+            card=card, text=text, position=card.checklist_items.count()
+        )
+    return redirect('card_detail', pk=card_pk)
+
+
+@login_required
+@require_POST
+def checklist_item_toggle(request, pk):
+    item = get_object_or_404(ChecklistItem, pk=pk)
+    if not _is_member(request.user, item.card.list.board):
+        return HttpResponseForbidden()
+    item.is_done = not item.is_done
+    item.save(update_fields=['is_done'])
+    return redirect('card_detail', pk=item.card_id)
+
+
+@login_required
+@require_POST
+def checklist_item_delete(request, pk):
+    item = get_object_or_404(ChecklistItem, pk=pk)
+    card_id = item.card_id
+    if not _is_member(request.user, item.card.list.board):
+        return HttpResponseForbidden()
+    item.delete()
+    return redirect('card_detail', pk=card_id)
