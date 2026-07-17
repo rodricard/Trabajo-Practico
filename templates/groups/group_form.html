@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Crear grupo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'group_list' %}" class="breadcrumb">&#8592; Grupos</a>
+        <h1>Crear grupo de trabajo</h1>
+    </div>
+</div>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label>{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="field-errors">
+                {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Crear grupo</button>
+            <a href="{% url 'group_list' %}" class="btn btn-ghost">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

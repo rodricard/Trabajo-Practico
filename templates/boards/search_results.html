@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Búsqueda — Tableo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>&#128269; Resultados de búsqueda</h1>
+</div>
+
+<form method="get" action="{% url 'search' %}" class="form-container" style="max-width:500px;margin-bottom:1.5rem;">
+    <div style="display:flex;gap:.5rem;">
+        <input type="search" name="q" value="{{ query }}" placeholder="Buscar tarjetas..." class="form-control" autofocus>
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+</form>
+
+{% if query %}
+    {% if results %}
+    <p class="text-muted" style="margin-bottom:1rem;">{{ results|length }} resultado{{ results|length|pluralize:"s" }} para "<strong>{{ query }}</strong>"</p>
+    <div class="form-container" style="padding:0;overflow:hidden;">
+        {% for card in results %}
+        <a href="{% url 'card_detail' card.pk %}" class="search-result-item">
+            <div>
+                <strong>{{ card.title }}</strong>
+                <small class="text-muted">{{ card.list.board.title }} › {{ card.list.title }}</small>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+                {% if card.assigned_to %}
+                <span class="card-avatar" title="{{ card.assigned_to.username }}">{{ card.assigned_to.username|first|upper }}</span>
+                {% endif %}
+                <span class="card-status-dot card-status-dot--{{ card.status }}" title="{{ card.get_status_display }}"></span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="list-empty">No se encontraron tarjetas para "<strong>{{ query }}</strong>".</p>
+    {% endif %}
+{% endif %}
+{% endblock %}

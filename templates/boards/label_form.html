@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Nueva etiqueta{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Nueva etiqueta</h1>
+    <a href="{% url 'board_detail' board.pk %}" class="btn btn-ghost">Cancelar</a>
+</div>
+
+<div class="form-container">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="field-errors">
+                {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Crear etiqueta</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from groups.models import Notification
 
-from .models import Board, BoardMember, Card, ChecklistItem, Label, List
+from .models import Board, BoardMember, Card, ChecklistItem, Comment, Label, List
 
 
 class BoardModelTests(TestCase):
@@ -269,3 +269,110 @@ class ChecklistTests(TestCase):
         self.assertEqual(response.status_code, 403)
         item.refresh_from_db()
         self.assertFalse(item.is_done)
+
+
+class CommentLabelTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.member = User.objects.create_user('member', password='pass12345')
+        self.outsider = User.objects.create_user('outsider', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        BoardMember.objects.create(board=self.board, user=self.member, role='member')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.client.login(username='owner', password='pass12345')
+
+    def test_add_comment(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {'content': 'Hola equipo'})
+        self.assertEqual(self.card.comments.count(), 1)
+        self.assertEqual(self.card.comments.first().author, self.owner)
+
+    def test_author_can_delete_own_comment(self):
+        comment = Comment.objects.create(card=self.card, author=self.owner, content='Borrame')
+        self.client.post(reverse('comment_delete', args=[comment.pk]))
+        self.assertFalse(Comment.objects.filter(pk=comment.pk).exists())
+
+    def test_non_author_non_admin_cannot_delete_comment(self):
+        comment = Comment.objects.create(card=self.card, author=self.owner, content='No me borres')
+        self.client.logout()
+        self.client.login(username='member', password='pass12345')
+        response = self.client.post(reverse('comment_delete', args=[comment.pk]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Comment.objects.filter(pk=comment.pk).exists())
+
+    def test_outsider_cannot_comment(self):
+        self.client.logout()
+        self.client.login(username='outsider', password='pass12345')
+        response = self.client.post(reverse('comment_add', args=[self.card.pk]), {'content': 'Colado'})
+        self.assertEqual(response.status_code, 403)
+
+    def test_label_create_requires_board_admin(self):
+        self.client.logout()
+        self.client.login(username='member', password='pass12345')
+        response = self.client.post(reverse('label_create', args=[self.board.pk]), {
+            'name': 'Urgente', 'color': 'urgente',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.board.labels.count(), 0)
+
+    def test_board_admin_can_create_label(self):
+        self.client.post(reverse('label_create', args=[self.board.pk]), {
+            'name': 'Urgente', 'color': 'urgente',
+        })
+        self.assertEqual(self.board.labels.count(), 1)
+
+    def test_label_toggle_adds_and_removes(self):
+        label = Label.objects.create(name='Urgente', color='urgente', board=self.board)
+        self.client.post(reverse('label_toggle', args=[self.card.pk]), {'label_id': label.pk})
+        self.assertIn(label, self.card.labels.all())
+        self.client.post(reverse('label_toggle', args=[self.card.pk]), {'label_id': label.pk})
+        self.assertNotIn(label, self.card.labels.all())
+
+
+class MentionTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.member = User.objects.create_user('mariagomez', password='pass12345')
+        self.outsider = User.objects.create_user('outsider', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        BoardMember.objects.create(board=self.board, user=self.member, role='member')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.client.login(username='owner', password='pass12345')
+
+    def test_mentioning_a_board_member_notifies_them(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {
+            'content': 'Che @mariagomez, revisá esto por favor',
+        })
+        self.assertTrue(
+            Notification.objects.filter(user=self.member, title__icontains='mencionó').exists()
+        )
+
+    def test_mentioning_yourself_does_not_notify(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {
+            'content': 'Nota para mí: @owner',
+        })
+        self.assertFalse(Notification.objects.filter(user=self.owner).exists())
+
+    def test_mentioning_a_non_member_does_not_notify_or_crash(self):
+        response = self.client.post(reverse('comment_add', args=[self.card.pk]), {
+            'content': 'Hola @outsider, no formás parte del tablero',
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Notification.objects.filter(user=self.outsider).exists())
+
+    def test_mentioning_same_user_twice_notifies_only_once(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {
+            'content': '@mariagomez posta @mariagomez mirá esto',
+        })
+        self.assertEqual(
+            Notification.objects.filter(user=self.member, title__icontains='mencionó').count(), 1
+        )
+
+    def test_comment_without_mention_does_not_notify(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {
+            'content': 'Comentario normal sin arrobas',
+        })
+        self.assertFalse(Notification.objects.exists())

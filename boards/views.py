@@ -1,3 +1,5 @@
+import re
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -7,10 +9,13 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Board, BoardMember, List, Card, ChecklistItem
-from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm
+from .models import Board, BoardMember, List, Card, ChecklistItem, Comment, Label, BoardMessage
+from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm, CommentForm, LabelForm, BoardMessageForm
 from .realtime import broadcast_board_event
 from groups.utils import notify_user, broadcast_user_event
+
+
+MENTION_RE = re.compile(r'@(\w+)')
 
 
 def _is_member(user, board):
@@ -85,9 +90,12 @@ def board_detail(request, pk):
     board = get_object_or_404(Board, pk=pk)
     if not _is_member(request.user, board):
         return HttpResponseForbidden('No tienes acceso a este tablero.')
+    is_admin = _is_board_admin(request.user, board)
+    can_write = is_admin or not board.is_chat_locked
     lists = board.lists.filter(is_archived=False).prefetch_related(
         Prefetch('cards', queryset=Card.objects.filter(is_archived=False).select_related('assigned_to'))
     )
+    chat_messages = board.chat_messages.select_related('user').all()
     archived_count = (
         board.lists.filter(is_archived=True).count()
         + Card.objects.filter(list__board=board, is_archived=True).count()
@@ -98,9 +106,48 @@ def board_detail(request, pk):
         'list_form':      ListForm(),
         'card_form':      CardQuickForm(),
         'is_owner':       _is_owner(request.user, board),
-        'is_board_admin': _is_board_admin(request.user, board),
+        'is_board_admin': is_admin,
+        'chat_messages':  chat_messages,
+        'message_form':   BoardMessageForm() if can_write else None,
+        'can_write':      can_write,
+        'today':          timezone.localdate(),
         'archived_count': archived_count,
     })
+
+
+@login_required
+@require_POST
+def board_message_send(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    if board.is_chat_locked and not _is_board_admin(request.user, board):
+        messages.error(request, 'El chat está bloqueado.')
+        return redirect('board_detail', pk=pk)
+    form = BoardMessageForm(request.POST)
+    if form.is_valid():
+        msg = form.save(commit=False)
+        msg.board = board
+        msg.user = request.user
+        msg.save()
+    return redirect('board_detail', pk=pk)
+
+
+@login_required
+@require_POST
+def board_toggle_chat_lock(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_board_admin(request.user, board):
+        return HttpResponseForbidden()
+    board.is_chat_locked = not board.is_chat_locked
+    board.save()
+    BoardMessage.objects.create(
+        board=board, user=None, is_system=True,
+        content=f'{request.user.username} {"bloqueó" if board.is_chat_locked else "desbloqueó"} el chat.'
+    )
+    estado = 'bloqueado' if board.is_chat_locked else 'desbloqueado'
+    messages.success(request, f'Chat {estado}.')
+    return redirect('board_detail', pk=pk)
 
 
 @login_required
@@ -376,6 +423,10 @@ def card_detail(request, pk):
     checklist_done = checklist_items.filter(is_done=True).count()
     checklist_percent = round(checklist_done * 100 / checklist_total) if checklist_total else 0
     board_users = User.objects.filter(board_memberships__board=board)
+    board_labels = board.labels.all()
+    mentionable_usernames = list(
+        board_users.exclude(pk=request.user.pk).values_list('username', flat=True)
+    )
     if request.method == 'POST':
         prev_assigned = card.assigned_to
         form = CardForm(request.POST, instance=card)
@@ -396,10 +447,104 @@ def card_detail(request, pk):
         'board':    board,
         'form':     form,
         'is_owner': _is_owner(request.user, board),
+        'is_board_admin': _is_board_admin(request.user, board),
         'checklist_items': checklist_items,
         'checklist_done_count': checklist_done,
         'checklist_percent': checklist_percent,
+        'comment_form': CommentForm(),
+        'comments':     card.comments.select_related('author').all(),
+        'board_labels': board_labels,
+        'mentionable_usernames': mentionable_usernames,
     })
+
+
+@login_required
+@require_POST
+def comment_add(request, card_pk):
+    card = get_object_or_404(Card, pk=card_pk)
+    board = card.list.board
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    form = CommentForm(request.POST)
+    if form.is_valid():
+        c = form.save(commit=False)
+        c.card = card
+        c.author = request.user
+        c.save()
+
+        mentioned_usernames = set(MENTION_RE.findall(c.content))
+        if mentioned_usernames:
+            mentioned_members = User.objects.filter(
+                board_memberships__board=board, username__in=mentioned_usernames,
+            ).exclude(pk=request.user.pk).distinct()
+            for member in mentioned_members:
+                notify_user(
+                    member,
+                    f'{request.user.username} te mencionó en un comentario en "{card.title}"',
+                    f'/boards/cards/{card.pk}/',
+                )
+    return redirect('card_detail', pk=card_pk)
+
+
+@login_required
+@require_POST
+def comment_delete(request, pk):
+    comment = get_object_or_404(Comment, pk=pk)
+    card = comment.card
+    if comment.author != request.user and not _is_board_admin(request.user, card.list.board):
+        return HttpResponseForbidden()
+    comment.delete()
+    return redirect('card_detail', pk=card.pk)
+
+
+@login_required
+@require_POST
+def label_toggle(request, card_pk):
+    card = get_object_or_404(Card, pk=card_pk)
+    if not _is_member(request.user, card.list.board):
+        return HttpResponseForbidden()
+    label_id = request.POST.get('label_id')
+    label = get_object_or_404(Label, pk=label_id, board=card.list.board)
+    if label in card.labels.all():
+        card.labels.remove(label)
+    else:
+        card.labels.add(label)
+    return redirect('card_detail', pk=card_pk)
+
+
+@login_required
+def search(request):
+    query = request.GET.get('q', '').strip()
+    results = []
+    if query:
+        user_boards = Board.objects.filter(board_members__user=request.user)
+        results = Card.objects.filter(
+            list__board__in=user_boards,
+            title__icontains=query,
+            is_archived=False,
+        ).select_related('list__board', 'assigned_to').order_by('list__board__title', 'title')
+    return render(request, 'boards/search_results.html', {
+        'query':   query,
+        'results': results,
+    })
+
+
+@login_required
+def label_create(request, board_pk):
+    board = get_object_or_404(Board, pk=board_pk)
+    if not _is_board_admin(request.user, board):
+        return HttpResponseForbidden()
+    if request.method == 'POST':
+        form = LabelForm(request.POST)
+        if form.is_valid():
+            label = form.save(commit=False)
+            label.board = board
+            label.save()
+            messages.success(request, 'Etiqueta creada.')
+            return redirect('board_detail', pk=board_pk)
+    else:
+        form = LabelForm()
+    return render(request, 'boards/label_form.html', {'form': form, 'board': board})
 
 
 @login_required
