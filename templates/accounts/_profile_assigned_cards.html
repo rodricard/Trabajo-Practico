@@ -1,0 +1,20 @@
+<div class="card">
+    <h2>Tarjetas asignadas</h2>
+    {% if assigned_cards %}
+    <ul class="card-list">
+        {% for card in assigned_cards %}
+        <li>
+            <a href="{% url 'card_detail' card.pk %}">{{ card.title }}</a>
+            <small>en {{ card.list.board.title }} / {{ card.list.title }}</small>
+            {% if card.due_date %}
+            <span class="badge {% if card.due_date < today and card.status != 'completado' %}badge-danger{% endif %}">
+                {{ card.due_date|date:"d/m/Y" }}
+            </span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state">No tienes tarjetas asignadas.</p>
+    {% endif %}
+</div>

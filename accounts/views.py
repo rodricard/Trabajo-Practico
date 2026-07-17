@@ -1,6 +1,8 @@
+from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.http import HttpResponseForbidden, JsonResponse
@@ -15,6 +17,15 @@ def _is_superadmin(user):
         return user.profile.is_superadmin
     except Exception:
         return False
+
+
+def _delete_avatar_file(profile):
+    if not profile.avatar:
+        return
+    try:
+        profile.avatar.delete(save=False)
+    except OSError:
+        pass
 
 
 def register(request):
@@ -34,13 +45,83 @@ def register(request):
 
 @login_required
 def profile(request):
+    from django.utils import timezone
+    today = timezone.localdate()
     owned_count = request.user.owned_boards.count()
     member_count = request.user.board_memberships.count()
     assigned_cards = request.user.assigned_cards.select_related('list__board').order_by('due_date')
+    overdue_count = assigned_cards.filter(due_date__lt=today).exclude(status='completado').count()
+    completed_count = assigned_cards.filter(status='completado').count()
     return render(request, 'accounts/profile.html', {
-        'owned_count':    owned_count,
-        'member_count':   member_count,
-        'assigned_cards': assigned_cards,
+        'owned_count':     owned_count,
+        'member_count':    member_count,
+        'assigned_cards':  assigned_cards,
+        'overdue_count':   overdue_count,
+        'completed_count': completed_count,
+        'today':           today,
+    })
+
+
+@login_required
+def profile_edit(request):
+    email_saved = False
+    password_saved = False
+    password_form = PasswordChangeForm(request.user)
+
+    if request.method == 'POST':
+        if 'change_avatar' in request.POST:
+            avatar = request.FILES.get('avatar')
+            if avatar:
+                _delete_avatar_file(request.user.profile)
+                request.user.profile.avatar = avatar
+                request.user.profile.save()
+                messages.success(request, 'Foto de perfil actualizada.')
+            else:
+                messages.error(request, 'Seleccioná una imagen.')
+
+        elif 'remove_avatar' in request.POST:
+            _delete_avatar_file(request.user.profile)
+            request.user.profile.avatar = None
+            request.user.profile.save()
+            messages.success(request, 'Foto de perfil eliminada.')
+
+        elif 'change_username' in request.POST:
+            new_username = request.POST.get('username', '').strip()
+            if not new_username:
+                messages.error(request, 'Ingresá un nombre de usuario.')
+            elif User.objects.filter(username=new_username).exclude(pk=request.user.pk).exists():
+                messages.error(request, f'"{new_username}" ya está en uso por otra cuenta.')
+            else:
+                request.user.username = new_username
+                try:
+                    request.user.full_clean(exclude=['password'])
+                    request.user.save()
+                    messages.success(request, 'Nombre de usuario actualizado.')
+                except ValidationError as e:
+                    messages.error(request, ' '.join(sum(e.message_dict.values(), [])))
+
+        elif 'change_email' in request.POST:
+            new_email = request.POST.get('email', '').strip()
+            if new_email:
+                request.user.email = new_email
+                request.user.save()
+                messages.success(request, 'Correo actualizado.')
+                email_saved = True
+            else:
+                messages.error(request, 'Ingresá un correo válido.')
+
+        elif 'change_password' in request.POST:
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'Contraseña actualizada.')
+                password_saved = True
+            else:
+                messages.error(request, 'Corregí los errores en el formulario.')
+
+    return render(request, 'accounts/profile_edit.html', {
+        'password_form': password_form,
     })
 
 

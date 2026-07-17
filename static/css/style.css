@@ -598,10 +598,48 @@ a { color: inherit; text-decoration: none; }
 .member-info small  { color: #5e6c84; font-size: .78rem; }
 
 /* ---- Profile ---- */
-.profile-grid { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; max-width: 900px; }
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 4px rgba(9,30,66,.1);
+    margin-bottom: 1.5rem;
+}
+.profile-avatar-large {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #0079bf;
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 3px #0079bf;
+}
+.profile-avatar-large--img { object-fit: cover; }
+
+.avatar-edit-preview { margin-bottom: 1rem; }
+.avatar-edit-preview .profile-avatar-large { width: 88px; height: 88px; font-size: 2rem; }
+
+.profile-header-info { flex: 1; }
+.profile-header-info h1 { font-size: 1.3rem; margin-bottom: .2rem; }
+.profile-header-email { color: #5e6c84; font-size: .875rem; }
+.profile-header-meta  { color: #5e6c84; font-size: .78rem; margin-top: .15rem; }
+
+.summary-card--vencido { border-left-color: #eb5a46; }
+
+.profile-edit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; max-width: 900px; }
+.profile-edit-column { display: flex; flex-direction: column; gap: 1.5rem; }
 
 @media (max-width: 700px) {
-    .profile-grid { grid-template-columns: 1fr; }
+    .profile-edit-grid { grid-template-columns: 1fr; }
 }
 
 .card { background: #fff; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(9,30,66,.1); }
