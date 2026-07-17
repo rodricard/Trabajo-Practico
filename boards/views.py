@@ -448,6 +448,7 @@ def card_detail(request, pk):
     checklist_percent = round(checklist_done * 100 / checklist_total) if checklist_total else 0
     board_users = User.objects.filter(board_memberships__board=board)
     board_labels = board.labels.all()
+    board_lists = board.lists.filter(is_archived=False)
     mentionable_usernames = list(
         board_users.exclude(pk=request.user.pk).values_list('username', flat=True)
     )
@@ -455,6 +456,7 @@ def card_detail(request, pk):
         prev_assigned = card.assigned_to
         form = CardForm(request.POST, instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
         if form.is_valid():
             updated = form.save()
             broadcast_board_event(board.pk, 'card_updated', card_id=updated.pk, list_id=updated.list_id)
@@ -468,6 +470,7 @@ def card_detail(request, pk):
     else:
         form = CardForm(instance=card)
         form.fields['assigned_to'].queryset = board_users
+        form.fields['list'].queryset = board_lists
     return render(request, 'boards/card_detail.html', {
         'card':     card,
         'board':    board,
