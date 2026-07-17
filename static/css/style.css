@@ -801,6 +801,81 @@ a { color: inherit; text-decoration: none; }
     to   { opacity: 1; transform: translateY(0); }
 }
 
+.notif-bell-btn {
+    position: relative;
+    background: rgba(255,255,255,.15);
+    border: none;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: .4rem .6rem;
+    border-radius: 20px;
+    transition: background .15s;
+    line-height: 1;
+}
+.notif-bell-btn:hover,
+.notif-bell-btn.active { background: rgba(255,255,255,.25); }
+.notif-bell-btn .notif-badge { position: absolute; top: -2px; right: -2px; margin-left: 0; }
+
+.notif-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(9,30,66,.25);
+    min-width: 300px;
+    max-width: 340px;
+    z-index: 400;
+    overflow: hidden;
+    animation: dropdownIn .15s ease;
+}
+.notif-dropdown-menu.open { display: block; }
+
+.notif-dropdown-header {
+    padding: .85rem 1rem;
+    font-weight: 700;
+    font-size: .9rem;
+    color: #172b4d;
+    border-bottom: 1px solid #dfe1e6;
+}
+
+.notif-dropdown-list { max-height: 320px; overflow-y: auto; }
+
+.notif-dropdown-item {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+    padding: .7rem 1rem;
+    border-bottom: 1px solid #f4f5f7;
+    color: #172b4d;
+}
+.notif-dropdown-item:hover { background: #f4f5f7; }
+.notif-dropdown-item--unread { background: #e6f0ff; border-left: 3px solid #0079bf; }
+
+.notif-dropdown-text { font-size: .8rem; line-height: 1.3; }
+.notif-dropdown-time { font-size: .72rem; color: #5e6c84; }
+
+.notif-dropdown-empty { padding: 1.5rem 1rem; text-align: center; color: #5e6c84; font-size: .85rem; }
+
+.notif-dropdown-footer {
+    display: block;
+    text-align: center;
+    padding: .65rem;
+    font-size: .8rem;
+    color: #0079bf;
+    font-weight: 600;
+    border-top: 1px solid #dfe1e6;
+}
+.notif-dropdown-footer:hover { background: #f4f5f7; }
+
+.notif-dropdown-item--enter { animation: notifDropdownItemIn .35s ease; background: #fff9db; }
+@keyframes notifDropdownItemIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 .autocomplete-suggestions {
     display: none;
     position: absolute;
