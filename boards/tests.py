@@ -1,9 +1,11 @@
+from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
 from groups.models import Notification
 
+from .consumers import BoardConsumer
 from .models import Activity, Board, BoardMember, Card, ChecklistItem, Comment, Label, List
 
 
@@ -425,3 +427,54 @@ class ActivityTests(TestCase):
         response = self.client.get(reverse('board_activity', args=[self.board.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'hizo algo')
+
+
+class PresenceTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.member = User.objects.create_user('mariagomez', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        BoardMember.objects.create(board=self.board, user=self.member, role='member')
+
+    async def _connect(self, user):
+        communicator = WebsocketCommunicator(BoardConsumer.as_asgi(), f'/ws/boards/{self.board.pk}/')
+        communicator.scope['user'] = user
+        communicator.scope['url_route'] = {'kwargs': {'board_id': str(self.board.pk)}}
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        return communicator
+
+    async def test_connecting_broadcasts_presence_to_self(self):
+        comm = await self._connect(self.owner)
+        payload = await comm.receive_json_from()
+        self.assertEqual(payload['event'], 'presence_update')
+        self.assertEqual(payload['viewers'], ['owner'])
+        await comm.disconnect()
+
+    async def test_second_viewer_appears_for_first(self):
+        comm1 = await self._connect(self.owner)
+        await comm1.receive_json_from()
+
+        comm2 = await self._connect(self.member)
+        await comm2.receive_json_from()
+
+        payload = await comm1.receive_json_from()
+        self.assertEqual(payload['event'], 'presence_update')
+        self.assertEqual(sorted(payload['viewers']), ['mariagomez', 'owner'])
+
+        await comm1.disconnect()
+        await comm2.disconnect()
+
+    async def test_disconnect_removes_viewer(self):
+        comm1 = await self._connect(self.owner)
+        await comm1.receive_json_from()
+        comm2 = await self._connect(self.member)
+        await comm2.receive_json_from()
+        await comm1.receive_json_from()
+
+        await comm2.disconnect()
+        payload = await comm1.receive_json_from()
+        self.assertEqual(payload['viewers'], ['owner'])
+
+        await comm1.disconnect()

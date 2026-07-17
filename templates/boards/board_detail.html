@@ -31,6 +31,11 @@
     </div>
 </div>
 
+<div class="board-viewers" id="boardViewers" style="display:none;">
+    <span class="board-viewers-label">&#128065; Viendo ahora:</span>
+    <div class="board-viewers-avatars" id="boardViewersAvatars"></div>
+</div>
+
 <!-- Filtros -->
 <div class="board-filters">
     <select id="filterStatus" class="filter-select">
@@ -171,6 +176,21 @@
 
     boardSocket.onmessage = function (e) {
         const data = JSON.parse(e.data);
+
+        if (data.event === 'presence_update') {
+            const bar = document.getElementById('boardViewers');
+            const avatars = document.getElementById('boardViewersAvatars');
+            avatars.innerHTML = '';
+            data.viewers.forEach(function (username) {
+                const span = document.createElement('span');
+                span.className = 'member-avatar board-viewer-avatar';
+                span.title = username;
+                span.textContent = username.charAt(0).toUpperCase();
+                avatars.appendChild(span);
+            });
+            bar.style.display = data.viewers.length ? 'flex' : 'none';
+            return;
+        }
 
         if (data.event === 'card_moved') {
             const card = document.querySelector(`.card-item[data-card-id="${data.card_id}"]`);
