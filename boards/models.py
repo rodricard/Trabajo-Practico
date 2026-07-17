@@ -19,6 +19,19 @@ class Board(models.Model):
         return self.title
 
 
+class Activity(models.Model):
+    board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='activities')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    text = models.CharField(max_length=300)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'[{self.board.title}] {self.text}'
+
+
 class BoardMessage(models.Model):
     board = models.ForeignKey('Board', on_delete=models.CASCADE, related_name='chat_messages')
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='board_messages')

@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from groups.models import Notification
 
-from .models import Board, BoardMember, Card, ChecklistItem, Comment, Label, List
+from .models import Activity, Board, BoardMember, Card, ChecklistItem, Comment, Label, List
 
 
 class BoardModelTests(TestCase):
@@ -376,3 +376,52 @@ class MentionTests(TestCase):
             'content': 'Comentario normal sin arrobas',
         })
         self.assertFalse(Notification.objects.exists())
+
+
+class ActivityTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('owner', password='pass12345')
+        self.outsider = User.objects.create_user('outsider', password='pass12345')
+        self.board = Board.objects.create(title='Board', owner=self.owner)
+        BoardMember.objects.create(board=self.board, user=self.owner, role='owner')
+        self.lst = List.objects.create(title='A', board=self.board, position=0)
+        self.card = Card.objects.create(title='C1', list=self.lst, position=0)
+        self.client.login(username='owner', password='pass12345')
+
+    def test_creating_a_list_logs_activity(self):
+        self.client.post(reverse('list_create', args=[self.board.pk]), {'title': 'Nueva'})
+        self.assertTrue(self.board.activities.filter(text__icontains='creó la lista').exists())
+
+    def test_creating_a_card_logs_activity(self):
+        self.client.post(reverse('card_create', args=[self.lst.pk]), {'title': 'Nueva tarjeta'})
+        self.assertTrue(self.board.activities.filter(text__icontains='creó la tarjeta').exists())
+
+    def test_archiving_a_card_logs_activity(self):
+        self.client.post(reverse('card_delete', args=[self.card.pk]))
+        self.assertTrue(self.board.activities.filter(text__icontains='archivó la tarjeta').exists())
+
+    def test_commenting_logs_activity(self):
+        self.client.post(reverse('comment_add', args=[self.card.pk]), {'content': 'Hola'})
+        self.assertTrue(self.board.activities.filter(text__icontains='comentó').exists())
+
+    def test_moving_card_between_lists_logs_activity(self):
+        other_list = List.objects.create(title='B', board=self.board, position=1)
+        self.client.post(reverse('card_move', args=[self.card.pk]), {'list_id': other_list.pk, 'position': 0})
+        self.assertTrue(self.board.activities.filter(text__icontains='movió la tarjeta').exists())
+
+    def test_reordering_within_same_list_does_not_log_activity(self):
+        Card.objects.create(title='C2', list=self.lst, position=1)
+        self.client.post(reverse('card_move', args=[self.card.pk]), {'list_id': self.lst.pk, 'position': 1})
+        self.assertFalse(self.board.activities.filter(text__icontains='movió la tarjeta').exists())
+
+    def test_outsider_cannot_view_activity(self):
+        self.client.logout()
+        self.client.login(username='outsider', password='pass12345')
+        response = self.client.get(reverse('board_activity', args=[self.board.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_member_can_view_activity(self):
+        Activity.objects.create(board=self.board, user=self.owner, text='hizo algo')
+        response = self.client.get(reverse('board_activity', args=[self.board.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'hizo algo')

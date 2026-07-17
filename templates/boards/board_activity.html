@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Actividad - {{ board.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="{% url 'board_detail' board.pk %}" class="breadcrumb">&#8592; {{ board.title }}</a>
+        <h1>&#128337; Actividad reciente</h1>
+    </div>
+</div>
+
+<div class="form-container" style="max-width:700px;">
+    {% if activities %}
+    <ul class="activity-list">
+        {% for activity in activities %}
+        <li class="activity-item">
+            <span class="member-avatar" style="width:28px;height:28px;font-size:.75rem;">
+                {% if activity.user %}{{ activity.user.username|first|upper }}{% else %}?{% endif %}
+            </span>
+            <div>
+                <span>
+                    <strong>{% if activity.user %}{{ activity.user.username }}{% else %}Alguien{% endif %}</strong>
+                    {{ activity.text }}
+                </span>
+                <small class="chat-time" style="display:block;">{{ activity.created_at|date:"d/m/Y H:i" }}</small>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="list-empty">Todavía no hay actividad registrada en este tablero.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -8,6 +8,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.board_update, name='board_update'),
     path('<int:pk>/delete/', views.board_delete, name='board_delete'),
     path('<int:pk>/archivados/', views.board_archived, name='board_archived'),
+    path('<int:pk>/actividad/', views.board_activity, name='board_activity'),
     path('<int:pk>/members/', views.board_members, name='board_members'),
     path('<int:board_pk>/members/buscar/', views.board_member_search, name='board_member_search'),
     path('<int:board_pk>/members/<int:member_pk>/remove/', views.board_member_remove, name='board_member_remove'),

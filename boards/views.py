@@ -9,7 +9,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Board, BoardMember, List, Card, ChecklistItem, Comment, Label, BoardMessage
+from .models import Board, BoardMember, List, Card, ChecklistItem, Comment, Label, BoardMessage, Activity
 from .forms import BoardForm, ListForm, CardForm, CardQuickForm, BoardMemberForm, CommentForm, LabelForm, BoardMessageForm
 from .realtime import broadcast_board_event
 from groups.utils import notify_user, broadcast_user_event
@@ -34,6 +34,10 @@ def _reindex(queryset):
     for index, obj in enumerate(queryset):
         if obj.position != index:
             type(obj).objects.filter(pk=obj.pk).update(position=index)
+
+
+def _log_activity(board, user, text):
+    Activity.objects.create(board=board, user=user, text=text)
 
 
 @login_required
@@ -198,6 +202,18 @@ def board_archived(request, pk):
 
 
 @login_required
+def board_activity(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if not _is_member(request.user, board):
+        return HttpResponseForbidden()
+    activities = board.activities.select_related('user')[:100]
+    return render(request, 'boards/board_activity.html', {
+        'board': board,
+        'activities': activities,
+    })
+
+
+@login_required
 def board_members(request, pk):
     board = get_object_or_404(Board, pk=pk)
     if not _is_board_admin(request.user, board):
@@ -215,6 +231,7 @@ def board_members(request, pk):
                 else:
                     BoardMember.objects.create(board=board, user=user, role='member')
                     notify_user(user, f'{request.user.username} te agregó al tablero "{board.title}"', f'/boards/{board.pk}/')
+                    _log_activity(board, request.user, f'agregó a {user.username} al tablero')
                     broadcast_user_event(
                         user.id, 'board_added',
                         board_id=board.pk, title=board.title,
@@ -299,6 +316,7 @@ def list_create(request, board_pk):
             lst.position = board.lists.count()
             lst.save()
             broadcast_board_event(board.pk, 'list_created', list_id=lst.pk, title=lst.title, position=lst.position)
+            _log_activity(board, request.user, f'creó la lista "{lst.title}"')
     return redirect('board_detail', pk=board_pk)
 
 
@@ -313,6 +331,7 @@ def list_delete(request, pk):
         lst.save(update_fields=['is_archived'])
         lst.cards.filter(is_archived=False).update(is_archived=True)
         broadcast_board_event(board.pk, 'list_deleted', list_id=lst.pk)
+        _log_activity(board, request.user, f'archivó la lista "{lst.title}"')
         messages.success(request, f'Lista "{lst.title}" archivada.')
     return redirect('board_detail', pk=board.pk)
 
@@ -378,6 +397,7 @@ def card_create(request, list_pk):
             card.position = lst.cards.filter(is_archived=False).count()
             card.save()
             broadcast_board_event(lst.board.pk, 'card_created', card_id=card.pk, list_id=lst.pk, title=card.title, position=card.position)
+            _log_activity(lst.board, request.user, f'creó la tarjeta "{card.title}" en "{lst.title}"')
     return redirect('board_detail', pk=lst.board.pk)
 
 
@@ -406,6 +426,10 @@ def card_move(request, pk):
         card.list = target_list
         card.save(update_fields=['list'])
         _reindex(source_list.cards.filter(is_archived=False).order_by('position'))
+        _log_activity(
+            board, request.user,
+            f'movió la tarjeta "{card.title}" de "{source_list.title}" a "{target_list.title}"',
+        )
 
     broadcast_board_event(board.pk, 'card_moved', card_id=card.pk, list_id=target_list.pk, position=new_position)
 
@@ -437,6 +461,8 @@ def card_detail(request, pk):
             new_assigned = updated.assigned_to
             if new_assigned and new_assigned != prev_assigned and new_assigned != request.user:
                 notify_user(new_assigned, f'{request.user.username} te asignó la tarjeta "{card.title}"', f'/boards/cards/{card.pk}/')
+            if new_assigned != prev_assigned:
+                _log_activity(board, request.user, f'asignó "{card.title}" a {new_assigned.username if new_assigned else "nadie"}')
             messages.success(request, 'Tarjeta actualizada.')
             return redirect('card_detail', pk=card.pk)
     else:
@@ -471,6 +497,7 @@ def comment_add(request, card_pk):
         c.card = card
         c.author = request.user
         c.save()
+        _log_activity(board, request.user, f'comentó en la tarjeta "{card.title}"')
 
         mentioned_usernames = set(MENTION_RE.findall(c.content))
         if mentioned_usernames:
@@ -509,6 +536,7 @@ def label_toggle(request, card_pk):
         card.labels.remove(label)
     else:
         card.labels.add(label)
+        _log_activity(card.list.board, request.user, f'etiquetó "{card.title}" con "{label.name}"')
     return redirect('card_detail', pk=card_pk)
 
 
@@ -557,6 +585,7 @@ def card_delete(request, pk):
         card.is_archived = True
         card.save(update_fields=['is_archived'])
         broadcast_board_event(board.pk, 'card_deleted', card_id=card.pk)
+        _log_activity(board, request.user, f'archivó la tarjeta "{card.title}"')
         messages.success(request, f'Tarjeta "{card.title}" archivada.')
     return redirect('board_detail', pk=board.pk)
 

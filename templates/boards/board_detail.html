@@ -10,6 +10,9 @@
             <a href="{% url 'board_archived' board.pk %}" class="btn btn-ghost-light">
                 &#128230; Archivados{% if archived_count %} ({{ archived_count }}){% endif %}
             </a>
+            <a href="{% url 'board_activity' board.pk %}" class="btn btn-ghost-light">
+                &#128337; Actividad
+            </a>
             {% if is_board_admin %}
             <a href="{% url 'board_members' board.pk %}" class="btn btn-ghost-light">Miembros</a>
             <a href="{% url 'board_update' board.pk %}" class="btn btn-ghost-light">Configurar</a>
