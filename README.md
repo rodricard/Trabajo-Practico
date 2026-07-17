@@ -1,4 +1,4 @@
-# Tableo
+# ListMeApp
 
 Tablero de tareas estilo Trello hecho con Django, con tableros, listas y tarjetas organizadas por drag & drop, grupos de trabajo y notificaciones en tiempo real vía WebSockets (Django Channels).
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Tableo{% endblock %}</title>
+    <title>{% block title %}ListMeApp{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
@@ -14,7 +14,7 @@
         {% if user.is_authenticated %}
         <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
         {% endif %}
-        <a href="{% url 'board_list' %}" class="topbar-brand">&#9670; Tableo</a>
+        <a href="{% url 'board_list' %}" class="topbar-brand">&#9670; ListMeApp</a>
         {% if user.is_authenticated %}
         <form method="get" action="{% url 'search' %}" class="topbar-search">
             <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar tarjetas..." class="search-input" autocomplete="off">
